@@ -24,9 +24,10 @@ const rooms = {};
 
 // Configuración de oleadas (compartida por todas las salas)
 const oleadasConfig = [
-    { cantidad: 5, delay: 2000, espera: 10000 },
-    { cantidad: 8, delay: 1500, espera: 15000 },
-    { cantidad: 12, delay: 1000, espera: 20000 }
+    { cantidad: 10, delay: 2000, espera: 10000 },
+    { cantidad: 15, delay: 2000, espera: 15000 },
+    { cantidad: 20, delay: 2000, espera: 20000 },
+    { cantidad: 30, delay: 2000, espera: 15000 }
 ];
 
 // Función para inicializar el estado del juego para una sala
@@ -35,11 +36,36 @@ function initializeGameState() {
         torres: [],
         enemigos: [],
         monedas: 100,
-        oleadaActual: 0,
+        oleadaActual: 1,
         enemigosRestantes: 0,
         enOleada: false,
         primeraConexion: true
     };
+}
+
+// Función para generar la ruta de un enemigo
+function generatePath(roomCode) {
+    // Definir el camino basado en tus casillas de tipo 0 (camino)
+    const pathCoords = [
+        { row: 0, col: 12 },   // Punto de entrada
+        { row: 2, col: 12 },
+        { row: 2, col: 10 },
+        { row: 4, col: 8 },
+        { row: 8, col: 8 },
+        { row: 8, col: 16 },
+        { row: 11, col: 16 },
+        { row: 11, col: 20 },
+        { row: 13, col: 23 },
+        { row: 15, col: 23 }   // Base
+    ];
+
+    const tileSize = 60; // Tamaño base de casillas
+
+    // Convertir a coordenadas en píxeles, centradas en la casilla
+    return pathCoords.map(point => ({
+        x: point.col * tileSize + (tileSize / 2),
+        y: point.row * tileSize + (tileSize / 2)
+    }));
 }
 
 // Función para iniciar oleada en una sala específica
@@ -49,6 +75,7 @@ function iniciarOleada(io, roomCode, oleadaIndex) {
     const config = oleadasConfig[oleadaIndex];
     const gameState = rooms[roomCode].gameState;
 
+    // Asignar oleadaActual como oleadaIndex + 1 para que comience en 1
     gameState.oleadaActual = oleadaIndex + 1;
     gameState.enemigosRestantes = config.cantidad;
     gameState.enOleada = true;
@@ -61,8 +88,12 @@ function iniciarOleada(io, roomCode, oleadaIndex) {
     const intervaloEnemigos = setInterval(() => {
         if (gameState.enemigosRestantes > 0) {
             const nuevoEnemigo = {
-                id: Date.now(),
-                oleada: gameState.oleadaActual
+                id: Date.now() + Math.floor(Math.random() * 1000), // ID único
+                oleada: gameState.oleadaActual,
+                path: generatePath(roomCode),
+                currentPoint: 0,
+                x: generatePath(roomCode)[0].x,
+                y: generatePath(roomCode)[0].y
             };
 
             gameState.enemigos.push(nuevoEnemigo);
@@ -90,6 +121,52 @@ function iniciarOleada(io, roomCode, oleadaIndex) {
         }
     }, config.delay);
 }
+
+// Función para actualizar y sincronizar las posiciones de los enemigos
+function updateEnemyPositions() {
+    for (const roomCode in rooms) {
+        const room = rooms[roomCode];
+        if (room.status !== 'playing') continue;
+
+        // Para cada enemigo en la sala, actualiza su posición
+        room.gameState.enemigos.forEach(enemigo => {
+            // Sólo si hay puntos restantes en la ruta
+            if (enemigo.currentPoint < enemigo.path.length - 1) {
+                const nextPoint = enemigo.path[enemigo.currentPoint + 1];
+                const speed = 1; // Velocidad fija en el servidor
+
+                // Calcula nueva posición
+                const dx = nextPoint.x - enemigo.x;
+                const dy = nextPoint.y - enemigo.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance > speed) {
+                    enemigo.x += (dx / distance) * speed;
+                    enemigo.y += (dy / distance) * speed;
+                } else {
+                    enemigo.x = nextPoint.x;
+                    enemigo.y = nextPoint.y;
+                    enemigo.currentPoint++;
+                }
+
+                // Enviar la posición actualizada a todos los clientes
+                io.to(roomCode).emit('update-enemy-position', {
+                    id: enemigo.id,
+                    x: enemigo.x,
+                    y: enemigo.y,
+                    currentPoint: enemigo.currentPoint
+                });
+            } else if (enemigo.currentPoint === enemigo.path.length - 1) {
+                // El enemigo ha llegado al final del camino (base)
+                room.gameState.enemigos = room.gameState.enemigos.filter(e => e.id !== enemigo.id);
+                io.to(roomCode).emit('enemigo-reached-base', enemigo.id);
+            }
+        });
+    }
+}
+
+// Iniciar el bucle de actualización (30 fps)
+setInterval(updateEnemyPositions, 1000 / 30);
 
 io.on('connection', (socket) => {
     console.log('Nuevo cliente conectado:', socket.id);
@@ -167,6 +244,38 @@ io.on('connection', (socket) => {
 
                 console.log(`Juego iniciado automáticamente en sala: ${roomCode}`);
             }, 3000);
+        }
+    });
+
+    // Nuevo evento para abandonar sala explícitamente
+    socket.on('leaveRoom', ({ roomCode }) => {
+        if (roomCode && rooms[roomCode]) {
+            const playerIndex = rooms[roomCode].players.findIndex(p => p.id === socket.id);
+
+            if (playerIndex !== -1) {
+                // Eliminar al jugador de la sala
+                rooms[roomCode].players.splice(playerIndex, 1);
+
+                // Notificar a todos en la sala que el jugador se fue
+                io.to(roomCode).emit('playerLeft', {
+                    playerId: socket.id,
+                    playerIndex: playerIndex
+                });
+
+                // Hacer que el socket abandone la sala
+                socket.leave(roomCode);
+
+                // Eliminar la referencia de la sala en el socket
+                socket.roomCode = null;
+
+                console.log(`Jugador ${socket.id} abandonó voluntariamente la sala ${roomCode}`);
+
+                // Si la sala está vacía, eliminarla
+                if (rooms[roomCode].players.length === 0) {
+                    delete rooms[roomCode];
+                    console.log(`Sala eliminada: ${roomCode}`);
+                }
+            }
         }
     });
 

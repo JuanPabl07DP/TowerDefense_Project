@@ -4,11 +4,12 @@ export default class Projectile {
         this.x = x;         // Posición inicial X
         this.y = y;         // Posición inicial Y
         this.target = target; // Referencia al enemigo objetivo
-        this.speed = 5;     // Velocidad del proyectil
+        this.speed = 5 * scene.map.scale; // Velocidad ajustada a la escala
+        this.damage = 1;    // Cantidad de daño que aplica
 
         // Crear el sprite del proyectil
         this.sprite = this.scene.add.sprite(x, y, 'projectile')
-            .setDisplaySize(10, 10); // Tamaño del proyectil
+            .setDisplaySize(10 * this.scene.map.scale, 10 * this.scene.map.scale); // Tamaño ajustado a la escala
     }
 
     // Método para actualizar la posición del proyectil
@@ -30,8 +31,23 @@ export default class Projectile {
             this.sprite.y += (dy / distance) * this.speed;
         } else {
             // El proyectil alcanzó al objetivo
-            this.target.destroy(); // Destruir el enemigo
-            this.destroy();        // Destruir el proyectil
+            const enemyDied = this.target.takeDamage(this.damage);
+
+            // Si el enemigo murió
+            if (enemyDied) {
+                // Dar recompensa de monedas
+                if (this.scene.agregarMonedas) {
+                    this.scene.agregarMonedas(30);
+                }
+
+                // Notificar al servidor que el enemigo ha sido eliminado
+                // Esto evitará que el servidor envíe un evento onEnemyReachedBase
+                if (this.scene.eliminarEnemigo) {
+                    this.scene.eliminarEnemigo(this.target.id);
+                }
+            }
+
+            this.destroy();
         }
     }
 

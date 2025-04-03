@@ -355,8 +355,14 @@ export default class RoomCreationScene extends Phaser.Scene {
 
     // Método para mostrar mensaje de desconexión
     showDisconnectionMessage(message) {
-        const width = this.cameras.main.width;
-        const height = this.cameras.main.height;
+        // Verificar que la escena esté activa
+        if (!this.scene || !this.scene.isActive('RoomCreationScene')) {
+            return;
+        }
+
+        // Obtener dimensiones de la pantalla con verificación
+        const width = this.cameras?.main?.width || 800;
+        const height = this.cameras?.main?.height || 600;
 
         // Crear contenedor para el mensaje
         const messageBox = this.add.graphics();
@@ -374,10 +380,12 @@ export default class RoomCreationScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Hacer que el mensaje desaparezca después de 3 segundos
-        this.time.delayedCall(3000, () => {
-            messageBox.destroy();
-            messageText.destroy();
-        });
+        if (this.time) {
+            this.time.delayedCall(3000, () => {
+                if (messageBox && messageBox.destroy) messageBox.destroy();
+                if (messageText && messageText.destroy) messageText.destroy();
+            });
+        }
     }
 
     startGame() {

@@ -49,6 +49,11 @@ export function startGame(roomCode) {
     socket.emit('startGame', { roomCode });
 }
 
+// Nueva función para abandonar una sala
+export function leaveRoom(roomCode) {
+    socket.emit('leaveRoom', { roomCode });
+}
+
 export function onPlayerJoined(callback) {
     // Eliminar listener previo para evitar duplicados
     socket.off('playerJoined');
@@ -121,6 +126,18 @@ export function onTemporizadorOleada(callback) {
     socket.on('temporizador-oleada', callback);
 }
 
+// Nuevo evento para sincronizar posiciones de enemigos
+export function onEnemyPositionUpdated(callback) {
+    socket.off('update-enemy-position'); // Evitar duplicados
+    socket.on('update-enemy-position', callback);
+}
+
+// Nuevo evento para cuando un enemigo llega a la base
+export function onEnemyReachedBase(callback) {
+    socket.off('enemigo-reached-base'); // Evitar duplicados
+    socket.on('enemigo-reached-base', callback);
+}
+
 // Función para gastar monedas
 export function gastarMonedas(cantidad) {
     socket.emit('gastar-monedas', cantidad);
@@ -132,5 +149,6 @@ export function agregarMonedas(cantidad) {
 }
 
 export function onActualizarMonedas(callback) {
+    socket.off('actualizar-monedas'); // Evitar duplicados
     socket.on('actualizar-monedas', callback);
 }
