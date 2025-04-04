@@ -109,7 +109,7 @@ export default class Map {
                     tile.col = col;
 
                     tile.on('pointerdown', () => {
-                        const towerCost = 20; // Costo de cada torre
+                        const towerCost = 25; // Costo de cada torre
                         if (this.scene.currencyManager.canAfford(towerCost)) {
                             if (this.scene.tower.placeTower(col, row)) {
                                 this.scene.currencyManager.spend(towerCost);

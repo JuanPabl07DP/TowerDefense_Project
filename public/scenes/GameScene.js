@@ -28,6 +28,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('guardia', 'assets/guardia.png');
         this.load.image('guardia2', 'assets/guardia2.png');
         this.load.image('fondoguerra', 'assets/fondoguerra.jpg');
+        this.load.image('fin', 'assets/fin.jpeg');
     }
 
     create() {
@@ -357,8 +358,15 @@ export default class GameScene extends Phaser.Scene {
 
     // Método para game over
     gameOver(victory) {
-        // Detener actualizaciones del juego
-        // this.scene.pause();
+        // Añadir la imagen de fin como fondo
+        const finBackground = this.add.image(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            'fin'
+        )
+            .setDisplaySize(this.cameras.main.width, this.cameras.main.height)
+            .setScrollFactor(0)
+            .setDepth(99);
 
         // Oscurecer el fondo
         const overlay = this.add.rectangle(
@@ -367,7 +375,7 @@ export default class GameScene extends Phaser.Scene {
             this.cameras.main.width,
             this.cameras.main.height,
             0x000000,
-            0.7
+            0.5
         ).setScrollFactor(0).setDepth(100);
 
         // Mostrar mensaje de victoria o derrota
@@ -386,39 +394,93 @@ export default class GameScene extends Phaser.Scene {
             }
         ).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-        // Crear el botón con mejor manejo de interactividad
-        const button = this.add.rectangle(
-            this.cameras.main.width / 2,
-            this.cameras.main.height / 2 + 100,
-            200,
-            50,
-            0xA67C52
-        )
-            .setDepth(1000); // Asegurar que esté por encima de otros elementos
+        // Crear botón con estilo de LobbyScene
+        const buttonX = this.cameras.main.width / 2;
+        const buttonY = this.cameras.main.height / 2 + 100;
+        const buttonWidth = 220;
+        const buttonHeight = 50;
+        const buttonRectX = buttonX - (buttonWidth / 2);
+        const buttonRectY = buttonY - (buttonHeight / 2);
+
+        // Crear gráfico para el botón
+        const button = this.add.graphics();
+        button.fillStyle(0xA67C52, 1);
+        button.lineStyle(3, 0x664433, 1);
+        button.fillRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+        button.strokeRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+
+        // Calcular valores para el borde interior
+        const scaleRatio = Math.min(this.cameras.main.width / 1280, this.cameras.main.height / 720);
+        const borderThickness = Math.max(1, Math.floor(2 * scaleRatio));
+        const borderOffset = Math.max(2, Math.floor(3 * scaleRatio));
+
+        // Borde interior decorativo
+        button.lineStyle(borderThickness, 0xD4A76A, 1);
+        button.strokeRect(
+            buttonRectX + borderOffset,
+            buttonRectY + borderOffset,
+            buttonWidth - (borderOffset * 2),
+            buttonHeight - (borderOffset * 2)
+        );
 
         // Texto del botón
         const buttonText = this.add.text(
-            button.x,
-            button.y,
+            buttonX,
+            buttonY,
             'Volver al Menú',
             {
-                fontSize: '24px',
-                fill: '#FFFFFF',
-                fontStyle: 'bold'
+                font: `bold ${Math.max(16, Math.floor(22 * scaleRatio))}px Arial`,
+                fill: '#ffffff',
+                stroke: '#000000',
+                strokeThickness: 2
             }
-        )
-            .setOrigin(0.5)
-            .setDepth(1001);
+        ).setOrigin(0.5).setDepth(102);
 
-        const testButton = this.add.text(
-            100, 100,
-            'TEST BUTTON',
-            { fontSize: '32px', fill: '#FF0000' }
-        )
-            .setInteractive()
+        // Hacer el botón interactivo
+        const hitArea = new Phaser.Geom.Rectangle(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+        button.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
             .on('pointerdown', () => {
-                console.log("Botón de prueba funciona");
-                this.scene.start('MenuScene');
+                // Efecto de botón presionado
+                button.clear();
+                button.fillStyle(0x7A5C32, 1);
+                button.fillRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+                button.lineStyle(3, 0x664433, 1);
+                button.strokeRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+
+                // Llamar a la función de retorno al menú después de un pequeño retraso
+                this.time.delayedCall(150, () => {
+                    this.cleanupGameAndLeaveRoom();
+                });
+            })
+            .on('pointerover', () => {
+                // Efecto hover
+                button.clear();
+                button.fillStyle(0xBB9062, 1);
+                button.fillRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+                button.lineStyle(3, 0x664433, 1);
+                button.strokeRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+                button.lineStyle(borderThickness, 0xD4A76A, 1);
+                button.strokeRect(
+                    buttonRectX + borderOffset,
+                    buttonRectY + borderOffset,
+                    buttonWidth - (borderOffset * 2),
+                    buttonHeight - (borderOffset * 2)
+                );
+            })
+            .on('pointerout', () => {
+                // Restaurar estado normal
+                button.clear();
+                button.fillStyle(0xA67C52, 1);
+                button.fillRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+                button.lineStyle(3, 0x664433, 1);
+                button.strokeRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
+                button.lineStyle(borderThickness, 0xD4A76A, 1);
+                button.strokeRect(
+                    buttonRectX + borderOffset,
+                    buttonRectY + borderOffset,
+                    buttonWidth - (borderOffset * 2),
+                    buttonHeight - (borderOffset * 2)
+                );
             });
     }
 
