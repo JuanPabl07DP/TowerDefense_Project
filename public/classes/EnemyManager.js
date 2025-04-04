@@ -48,7 +48,7 @@ export default class EnemyManager {
             if (enemy && enemy.sprite.active) {
                 // Dañar el castillo antes de eliminar el enemigo
                 if (this.scene.damageCastle) {
-                    this.scene.damageCastle(15); // Restar 15 de vida
+                    this.scene.damageCastle(10); // Restar 10 de vida
                 }
             }
             this.removeEnemy(enemyId);
