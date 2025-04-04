@@ -5,6 +5,7 @@ import Enemy from '../classes/Enemy.js';
 import EnemyManager from '../classes/EnemyManager.js';
 import Decorations from '../classes/Decorations.js';
 import CurrencyManager from "../classes/CurrencyManager";
+import { leaveRoom } from '../services/socketService';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -30,6 +31,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
+        this.input.keyboard.on('keydown-M', () => {
+            console.log("Tecla M presionada - Forzando cambio a MenuScene");
+            this.scene.start('MenuScene');
+        });
+
         // Hacer que las funciones de socket sean accesibles desde otras clases
         this.colocarTorre = colocarTorre;
         this.gastarMonedas = gastarMonedas;
@@ -315,9 +321,8 @@ export default class GameScene extends Phaser.Scene {
         this.events.on('oleada-completada', (oleada) => {
             console.log(`Oleada ${oleada} completada`);
 
-            // Verificar si era la última oleada
-            if (oleada >= 3) {
-                // Esperar un momento antes de mostrar la victoria
+            // Solo mostrar victoria si es la última oleada (4) y no hay enemigos activos
+            if (oleada >= 4 && this.enemyManager.enemies.length === 0) {
                 this.time.delayedCall(1500, () => {
                     this.gameOver(true); // true para victoria
                 });
@@ -353,7 +358,7 @@ export default class GameScene extends Phaser.Scene {
     // Método para game over
     gameOver(victory) {
         // Detener actualizaciones del juego
-        this.scene.pause();
+        // this.scene.pause();
 
         // Oscurecer el fondo
         const overlay = this.add.rectangle(
@@ -363,7 +368,7 @@ export default class GameScene extends Phaser.Scene {
             this.cameras.main.height,
             0x000000,
             0.7
-        ).setScrollFactor(0);
+        ).setScrollFactor(0).setDepth(100);
 
         // Mostrar mensaje de victoria o derrota
         const message = victory ? '¡Victoria!' : '¡Derrota!';
@@ -379,56 +384,58 @@ export default class GameScene extends Phaser.Scene {
                 stroke: '#000000',
                 strokeThickness: 6
             }
-        ).setOrigin(0.5).setScrollFactor(0);
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(101);
 
-        // Añadir botón para volver al menú
-        const buttonWidth = 200;
-        const buttonHeight = 50;
-        const buttonX = this.cameras.main.width / 2 - buttonWidth / 2;
-        const buttonY = this.cameras.main.height / 2 + 50 - buttonHeight / 2;
-
-        const button = this.add.graphics();
-        button.fillStyle(0xA67C52, 1);
-        button.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
-        button.lineStyle(3, 0x664433, 1);
-        button.strokeRect(buttonX, buttonY, buttonWidth, buttonHeight);
-
-        const buttonText = this.add.text(
+        // Crear el botón con mejor manejo de interactividad
+        const button = this.add.rectangle(
             this.cameras.main.width / 2,
-            this.cameras.main.height / 2 + 50,
+            this.cameras.main.height / 2 + 100,
+            200,
+            50,
+            0xA67C52
+        )
+            .setDepth(1000); // Asegurar que esté por encima de otros elementos
+
+        // Texto del botón
+        const buttonText = this.add.text(
+            button.x,
+            button.y,
             'Volver al Menú',
             {
                 fontSize: '24px',
-                fill: '#FFFFFF'
+                fill: '#FFFFFF',
+                fontStyle: 'bold'
             }
-        ).setOrigin(0.5).setScrollFactor(0);
+        )
+            .setOrigin(0.5)
+            .setDepth(1001);
 
-        // Hacer el botón interactivo
-        const hitArea = new Phaser.Geom.Rectangle(buttonX, buttonY, buttonWidth, buttonHeight);
-        button.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
+        const testButton = this.add.text(
+            100, 100,
+            'TEST BUTTON',
+            { fontSize: '32px', fill: '#FF0000' }
+        )
+            .setInteractive()
             .on('pointerdown', () => {
-                // Limpiar estado del juego y abandonar la sala
-                this.cleanupGameAndLeaveRoom();
+                console.log("Botón de prueba funciona");
+                this.scene.start('MenuScene');
             });
     }
 
     cleanupGameAndLeaveRoom() {
-        // Crear un evento de socket para abandonar la sala
-        if (socket) {
-            // Enviar evento para abandonar la sala explícitamente
-            socket.emit('leaveRoom', { roomCode: this.roomCode });
+        // Importar socketService localmente para asegurar la referencia
+        // Abandonar la sala si existe roomCode
+        if (this.roomCode) {
+            leaveRoom(this.roomCode);
         }
 
-        // Detener todos los eventos y listeners activos
-        this.events.removeAllListeners();
-
-        // Limpiar cualquier intervalo o timeout que pueda estar ejecutándose
-        this.time.removeAllEvents();
-
-        // Detener cualquier sonido en reproducción
+        // Detener todos los sonidos
         this.sound.stopAll();
 
-        // Iniciar la escena del menú
+        // Limpiar todos los objetos de la escena
+        this.children.removeAll();
+
+        // Reiniciar la escena del menú
         this.scene.start('MenuScene');
     }
 

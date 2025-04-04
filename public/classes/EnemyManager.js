@@ -48,7 +48,7 @@ export default class EnemyManager {
             if (enemy && enemy.sprite.active) {
                 // Dañar el castillo antes de eliminar el enemigo
                 if (this.scene.damageCastle) {
-                    this.scene.damageCastle(2); // Restar 2 de vida
+                    this.scene.damageCastle(100); // Restar 10 de vida
                 }
             }
             this.removeEnemy(enemyId);
@@ -82,8 +82,8 @@ export default class EnemyManager {
             // Emitir evento de oleada completada
             this.scene.events.emit('oleada-completada', this.oleadaActual);
 
-            // Si era la última oleada (3), mostrar victoria después de un breve retraso
-            if (this.oleadaActual >= 3) {
+            // Solo mostrar victoria si era la última oleada (4) y no hay enemigos activos
+            if (this.oleadaActual >= 4 && enemigosActivos.length === 0) {
                 this.scene.time.delayedCall(1500, () => {
                     if (this.scene.gameOver) {
                         this.scene.gameOver(true); // true para victoria

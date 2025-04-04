@@ -37,7 +37,7 @@ export default class Projectile {
             if (enemyDied) {
                 // Dar recompensa de monedas
                 if (this.scene.agregarMonedas) {
-                    this.scene.agregarMonedas(30);
+                    this.scene.agregarMonedas(3);
                 }
 
                 // Notificar al servidor que el enemigo ha sido eliminado

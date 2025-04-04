@@ -24,10 +24,10 @@ const rooms = {};
 
 // Configuración de oleadas (compartida por todas las salas)
 const oleadasConfig = [
-    { cantidad: 10, delay: 2000, espera: 10000 },
-    { cantidad: 15, delay: 2000, espera: 15000 },
-    { cantidad: 20, delay: 2000, espera: 20000 },
-    { cantidad: 30, delay: 2000, espera: 15000 }
+    { cantidad: 5, delay: 2000, espera: 10000 },
+    { cantidad: 8, delay: 2000, espera: 12000 },
+    { cantidad: 12, delay: 2000, espera: 15000 },
+    { cantidad: 15, delay: 2000, espera: 0 }
 ];
 
 // Función para inicializar el estado del juego para una sala
@@ -133,7 +133,7 @@ function updateEnemyPositions() {
             // Sólo si hay puntos restantes en la ruta
             if (enemigo.currentPoint < enemigo.path.length - 1) {
                 const nextPoint = enemigo.path[enemigo.currentPoint + 1];
-                const speed = 1; // Velocidad fija en el servidor
+                const speed = 2; // Velocidad fija en el servidor
 
                 // Calcula nueva posición
                 const dx = nextPoint.x - enemigo.x;
