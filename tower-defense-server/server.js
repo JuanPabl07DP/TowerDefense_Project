@@ -2,19 +2,35 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
+// Configuración para producción/desarrollo
+const isProduction = process.env.NODE_ENV === 'production';
+const frontendOrigin = isProduction ? '*' : 'http://localhost:5173';
+
+// Middleware
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: frontendOrigin,
     methods: ['GET', 'POST'],
     credentials: true
 }));
 app.use(express.json());
 
+// Servir archivos estáticos en producción
+if (isProduction) {
+    app.use(express.static(path.join(__dirname, '../dist')));
+
+    // Manejar todas las rutas para SPA
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '../dist', 'index.html'));
+    });
+}
+
 const server = http.createServer(app);
 const io = socketIO(server, {
     cors: {
-        origin: "http://localhost:5173",
+        origin: frontendOrigin,
         methods: ["GET", "POST"]
     }
 });

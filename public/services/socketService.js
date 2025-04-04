@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // Conectar al servidor de WebSockets - volver a localhost
-const socket = io('http://localhost:4000', {
+const socket = io('http://ec2-3-92-200-148.compute-1.amazonaws.com:4000', {
     withCredentials: true,
     transports: ['websocket', 'polling']
 });
