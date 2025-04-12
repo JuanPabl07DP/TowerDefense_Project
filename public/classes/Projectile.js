@@ -1,14 +1,14 @@
 export default class Projectile {
-    constructor(scene, x, y, target) {
+    constructor(scene, x, y, target, damage = 1, texture = 'projectile')  {
         this.scene = scene; // Referencia a la escena de Phaser
         this.x = x;         // Posición inicial X
         this.y = y;         // Posición inicial Y
         this.target = target; // Referencia al enemigo objetivo
         this.speed = 5 * scene.map.scale; // Velocidad ajustada a la escala
-        this.damage = 1;    // Cantidad de daño que aplica
+        this.damage = damage;    // Cantidad de daño que aplica
 
         // Crear el sprite del proyectil
-        this.sprite = this.scene.add.sprite(x, y, 'projectile')
+        this.sprite = this.scene.add.sprite(x, y, texture)
             .setDisplaySize(10 * this.scene.map.scale, 10 * this.scene.map.scale); // Tamaño ajustado a la escala
     }
 
@@ -35,9 +35,12 @@ export default class Projectile {
 
             // Si el enemigo murió
             if (enemyDied) {
-                // Dar recompensa de monedas
+                let reward = 5;
+                if (this.target.type === 'strong') reward = 10;
+                if (this.target.type === 'fast') reward = 8;
+
                 if (this.scene.agregarMonedas) {
-                    this.scene.agregarMonedas(5);
+                    this.scene.agregarMonedas(reward);
                 }
 
                 // Notificar al servidor que el enemigo ha sido eliminado

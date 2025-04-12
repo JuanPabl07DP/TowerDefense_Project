@@ -5,15 +5,52 @@ export default class Tower {
     constructor(scene, map) {
         this.scene = scene; // Referencia a la escena de Phaser
         this.map = map;     // Referencia al mapa
-        this.range = 100 * this.map.scale;  // Rango de ataque de la torre (escalado)
         this.projectiles = []; // Lista de proyectiles activos
-        this.cooldown = 5000; // Tiempo de espera entre disparos (en ms)
-        this.lastShot = 0;  // Tiempo del último disparo
         this.towers = [];   // Lista de torres colocadas
+        this.selectedTowerType = 'basic'; // Tipo de torre seleccionada por defecto
+
+        // Configuración de los tipos de torres
+        this.towerTypes = {
+            'basic': {
+                cost: 20,
+                range: 100,
+                cooldown: 2000,
+                damage: 1,
+                texture: 'tower',
+                projectileTexture: 'projectile',
+                scale: 1.0
+            },
+            'sniper': {
+                cost: 40,
+                range: 180,
+                cooldown: 3500,
+                damage: 3,
+                texture: 'tower_sniper',
+                projectileTexture: 'projectile_sniper',
+                scale: 1.0
+            },
+            'rapid': {
+                cost: 30,
+                range: 80,
+                cooldown: 800,
+                damage: 1,
+                texture: 'tower_rapid',
+                projectileTexture: 'projectile',
+                scale: 1.0
+            }
+        };
+    }
+
+    // Método para cambiar el tipo de torre seleccionada
+    setTowerType(type) {
+        if (this.towerTypes[type]) {
+            this.selectedTowerType = type;
+        }
     }
 
     // Método para colocar una torre
     placeTower(col, row) {
+        const towerType = this.towerTypes[this.selectedTowerType];
         if (this.map.getTileValue(row, col) === 1) {
             // Obtener la posición en la pantalla para esta casilla
             const position = this.map.getTilePosition(row, col);
@@ -32,7 +69,7 @@ export default class Tower {
             const tower = this.scene.add.image(
                 position.x,
                 position.y,
-                'tower'
+                towerType.texture
             )
                 .setOrigin(0.5, 0.5)
                 .setDisplaySize(this.map.tileSize, this.map.tileSize);
@@ -43,11 +80,13 @@ export default class Tower {
             // Agregar la torre a la lista
             this.towers.push({
                 sprite: tower,
-                base: grass, // Guardar referencia a la base de pasto
+                base: grass,
                 row: row,
                 col: col,
                 position: position,
-                lastShot: 0
+                lastShot: 0,
+                type: this.selectedTowerType,
+                config: towerType
             });
 
             // Iniciar el sistema de disparo para esta torre
@@ -65,17 +104,17 @@ export default class Tower {
     updateTower(tower) {
         const now = this.scene.time.now;
         const towerData = this.towers.find(t => t.sprite === tower);
+        const range = towerData.config.range * this.map.scale;
 
         // Verificar si la torre puede disparar
-        if (now - towerData.lastShot < this.cooldown) return;
+        if (now - towerData.lastShot < towerData.config.cooldown) return;
 
         // Buscar enemigos dentro del rango
-        const enemyManager = this.scene.enemyManager;
-        const target = enemyManager.enemies.find(enemy => {
+        const target = this.scene.enemyManager.enemies.find(enemy => {
             const dx = enemy.sprite.x - towerData.position.x;
             const dy = enemy.sprite.y - towerData.position.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            return distance <= this.range;
+            return distance <= range;
         });
 
         if (target) {
@@ -84,7 +123,9 @@ export default class Tower {
                 this.scene,
                 towerData.position.x,
                 towerData.position.y,
-                target
+                target,
+                towerData.config.damage,
+                towerData.config.projectileTexture
             );
             this.projectiles.push(projectile);
 
@@ -92,7 +133,8 @@ export default class Tower {
             dispararProyectil(
                 towerData.position.x,
                 towerData.position.y,
-                target.sprite.texture.key
+                target.id,
+                towerData.config.damage
             );
 
             // Actualizar el tiempo del último disparo
@@ -103,6 +145,6 @@ export default class Tower {
     // Método para actualizar los proyectiles
     update() {
         this.projectiles.forEach(projectile => projectile.update());
-        this.projectiles = this.projectiles.filter(projectile => projectile.sprite.active);
+        this.projectiles = this.projectiles.filter(p => p.sprite.active);
     }
 }

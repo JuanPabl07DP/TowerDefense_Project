@@ -18,6 +18,8 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('path', 'assets/camino.png');
         this.load.image('base', 'assets/puerta.jpeg');
         this.load.image('tower', 'assets/tower.png');
+        this.load.image('tower_sniper', 'assets/tower_sniper.png');
+        this.load.image('tower_rapid', 'assets/tower_rapid.png');
         this.load.image('enemy', 'assets/miniogro.gif');
         this.load.image('enemy_strong', 'assets/enemy_strong.png');
         this.load.image('enemy_fast', 'assets/enemy_fast.png');
@@ -26,6 +28,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('rock', 'assets/roca.png');
         this.load.image('bush', 'assets/casa.png');
         this.load.image('projectile', 'assets/projectile.png');
+        this.load.image('projectile_sniper', 'assets/projectile_sniper.gif');
         this.load.image('coin', 'assets/coin.png')
         this.load.image('guardia', 'assets/guardia.png');
         this.load.image('guardia2', 'assets/guardia2.png');
@@ -217,6 +220,8 @@ export default class GameScene extends Phaser.Scene {
         this.decorations.addRock(11,15)
         this.decorations.addRock(10,15)
 
+        this.createTowerSelectionUI();
+
         // Escuchar actualizaciones de monedas desde el servidor
         onActualizarMonedas((amount) => {
             this.currencyManager.amount = amount;
@@ -329,6 +334,112 @@ export default class GameScene extends Phaser.Scene {
                 this.time.delayedCall(1500, () => {
                     this.gameOver(true); // true para victoria
                 });
+            }
+        });
+    }
+
+    createTowerSelectionUI() {
+        if (!this.tower) {
+            console.error("Error: Tower system not initialized!");
+            return;
+        }
+        // Contenedor para los botones de selección de torres
+        this.towerSelectionContainer = this.add.container(20, this.cameras.main.height - 100)
+            .setScrollFactor(0)
+            .setDepth(1000);
+
+        // Fondo del panel
+        const bg = this.add.graphics()
+            .fillStyle(0x000000, 0.7)
+            .fillRoundedRect(0, 0, 400, 80, 10);
+        this.towerSelectionContainer.add(bg);
+
+        // Texto "Seleccionar torre"
+        const title = this.add.text(10, 10, 'Seleccionar torre:', {
+            fontSize: '16px',
+            fill: '#ffffff'
+        });
+        this.towerSelectionContainer.add(title);
+
+        // Botones para cada tipo de torre
+        const towerTypes = this.tower.towerTypes;
+        let xPos = 10;
+
+        Object.keys(towerTypes).forEach((type, index) => {
+            const towerType = towerTypes[type];
+
+            // Botón
+            const button = this.add.graphics()
+                .fillStyle(0x333333, 1)
+                .fillRoundedRect(xPos, 30, 100, 40, 5)
+                .setInteractive(new Phaser.Geom.Rectangle(xPos, 30, 100, 40), Phaser.Geom.Rectangle.Contains);
+
+            // Icono de torre (puedes usar imágenes pequeñas o texto)
+            const icon = this.add.image(xPos + 20, 50, towerType.texture)
+                .setDisplaySize(30, 30)
+                .setOrigin(0, 0.5);
+
+            // Texto con el costo
+            const costText = this.add.text(xPos + 60, 50, `$${towerType.cost}`, {
+                fontSize: '14px',
+                fill: '#FFD700'
+            }).setOrigin(0.5);
+
+            // Nombre de la torre
+            const nameText = this.add.text(xPos + 50, 35, type === 'basic' ? 'Básica' :
+                type === 'sniper' ? 'Sniper' : 'Rápida', {
+                fontSize: '12px',
+                fill: '#ffffff'
+            }).setOrigin(0.5);
+
+            // Resaltar si está seleccionada
+            if (this.tower.selectedTowerType === type) {
+                button.fillStyle(0x555555, 1)
+                    .fillRoundedRect(xPos, 30, 100, 40, 5);
+            }
+
+            // Eventos del botón
+            button.on('pointerdown', () => {
+                if (this.currencyManager.canAfford(towerType.cost)) {
+                    this.tower.setTowerType(type);
+                    // Actualizar visual de selección
+                    this.updateTowerSelectionUI();
+                } else {
+                    // Feedback de no suficiente dinero
+                    const feedback = this.add.text(
+                        this.cameras.main.width / 2,
+                        this.cameras.main.height - 150,
+                        '¡No tienes suficientes monedas!',
+                        { fontSize: '24px', fill: '#ff0000' }
+                    ).setScrollFactor(0).setDepth(1001);
+
+                    this.tweens.add({
+                        targets: feedback,
+                        alpha: 0,
+                        duration: 1500,
+                        onComplete: () => feedback.destroy()
+                    });
+                }
+            });
+
+            // Añadir elementos al contenedor
+            this.towerSelectionContainer.add([button, icon, costText, nameText]);
+            xPos += 110;
+        });
+    }
+
+    updateTowerSelectionUI() {
+        // Actualizar el aspecto visual de los botones de selección
+        const buttons = this.towerSelectionContainer.list.slice(1); // Saltar el fondo
+        const towerTypes = Object.keys(this.tower.towerTypes);
+
+        buttons.forEach((button, index) => {
+            if (index % 4 === 0) { // Cada botón es un grupo de 4 elementos
+                const type = towerTypes[index / 4];
+                button.fillStyle(
+                    this.tower.selectedTowerType === type ? 0x555555 : 0x333333,
+                    1
+                ).fillRoundedRect(10 + (index/4)*110, 30, 100, 40, 5);
             }
         });
     }

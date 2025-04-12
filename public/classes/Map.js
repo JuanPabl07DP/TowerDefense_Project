@@ -109,12 +109,12 @@ export default class Map {
                     tile.col = col;
 
                     tile.on('pointerdown', () => {
-                        const towerCost = 20; // Costo de cada torre
+                        const towerCost = this.scene.tower.towerTypes[this.scene.tower.selectedTowerType].cost;
+
                         if (this.scene.currencyManager.canAfford(towerCost)) {
                             if (this.scene.tower.placeTower(col, row)) {
                                 this.scene.currencyManager.spend(towerCost);
-                                this.scene.colocarTorre(col, row, 'tower'); // Notificar al servidor
-                                // Notificar al servidor del gasto
+                                this.scene.colocarTorre(col, row, this.scene.tower.selectedTowerType);
                                 this.scene.gastarMonedas(towerCost);
                             }
                         } else {
