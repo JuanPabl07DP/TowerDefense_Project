@@ -1,20 +1,32 @@
 export default class Enemy {
-    constructor(scene, path, id) {
+    constructor(scene, path, id, type = 'basic') {
         this.scene = scene; // Referencia a la escena de Phaser
         this.path = path;   // Ruta que el monstruo debe seguir
         this.currentPoint = 0; // Índice del punto actual en la ruta
         this.id = id || Date.now(); // Identificador único
-        this.health = 3; // Cada monstruo comienza con 3 puntos de vida
+        this.type = type;
 
-        // Crear el sprite del monstruo en el primer punto del camino
+        // Configuración basada en el tipo de monstruo
+        const enemyConfig = {
+            'basic': { health: 3, speed: 1, damage: 10, texture: 'enemy', scale: 1.0 },
+            'strong': { health: 6, speed: 0.5, damage: 20, texture: 'enemy_strong', scale: 1.2 },
+            'fast': { health: 2, speed: 1.5, damage: 5, texture: 'enemy_fast', scale: 0.9 }
+        };
+
+        this.config = enemyConfig[type] || enemyConfig.basic;
+        this.health = this.config.health;
+        this.maxHealth = this.config.health;
+        this.damage = this.config.damage;
+
+        // Crear el sprite del monstruo
         this.sprite = this.scene.add.sprite(
             this.path[0].x,
             this.path[0].y,
-            'enemy'
+            this.config.texture
+        ).setDisplaySize(
+            this.scene.map.tileSize * this.config.scale,
+            this.scene.map.tileSize * this.config.scale
         );
-
-        // Escalar el sprite al tamaño de las casillas
-        this.sprite.setDisplaySize(this.scene.map.tileSize, this.scene.map.tileSize);
 
         // Barra de vida (fondo)
         this.healthBarBackground = this.scene.add.rectangle(
@@ -40,12 +52,13 @@ export default class Enemy {
         this.health -= amount;
 
         // Actualizar la barra de vida
-        this.healthBar.width = (this.health / 3) * this.scene.map.tileSize;
+        this.healthBar.width = (this.health / this.maxHealth) * this.scene.map.tileSize;
 
         // Cambiar el color según la vida restante
-        if (this.health <= 1) {
+        const healthPercent = this.health / this.maxHealth;
+        if (healthPercent <= 0.25) {
             this.healthBar.fillColor = 0xFF0000; // Rojo
-        } else if (this.health <= 2) {
+        } else if (healthPercent <= 0.5) {
             this.healthBar.fillColor = 0xFFFF00; // Amarillo
         }
 

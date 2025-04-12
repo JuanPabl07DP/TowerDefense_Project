@@ -57,7 +57,7 @@ export default class EnemyManager {
 
     addEnemy(enemigo) {
         const path = this.map.createPath(); // Usar createPath() de Map
-        const enemy = new Enemy(this.scene, path, enemigo.id);
+        const enemy = new Enemy(this.scene, path, enemigo.id, enemigo.type);
         // Guardar información de oleada si existe
         if (enemigo.oleada) {
             enemy.oleada = enemigo.oleada;

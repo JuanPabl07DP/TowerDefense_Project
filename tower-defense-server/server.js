@@ -103,8 +103,20 @@ function iniciarOleada(io, roomCode, oleadaIndex) {
     // Generar enemigos
     const intervaloEnemigos = setInterval(() => {
         if (gameState.enemigosRestantes > 0) {
+            // Determinar el tipo de enemigo basado en la oleada
+            let enemyType = 'basic';
+            if (oleadaIndex >= 2) { // A partir de la oleada 3
+                const rand = Math.random();
+                if (rand < 0.3) {
+                    enemyType = 'strong';
+                } else if (rand < 0.6) {
+                    enemyType = 'fast';
+                }
+            }
+
             const nuevoEnemigo = {
-                id: Date.now() + Math.floor(Math.random() * 1000), // ID único
+                id: Date.now() + Math.floor(Math.random() * 1000),
+                type: enemyType,
                 oleada: gameState.oleadaActual,
                 path: generatePath(roomCode),
                 currentPoint: 0,
@@ -149,7 +161,11 @@ function updateEnemyPositions() {
             // Sólo si hay puntos restantes en la ruta
             if (enemigo.currentPoint < enemigo.path.length - 1) {
                 const nextPoint = enemigo.path[enemigo.currentPoint + 1];
-                const speed = 2.5; // Velocidad fija en el servidor
+                let speed = 1; // Velocidad base
+
+                // Ajustar velocidad según tipo
+                if (enemigo.type === 'strong') speed *= 0.5;
+                if (enemigo.type === 'fast') speed *= 1.5;
 
                 // Calcula nueva posición
                 const dx = nextPoint.x - enemigo.x;
