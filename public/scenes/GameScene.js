@@ -231,7 +231,7 @@ export default class GameScene extends Phaser.Scene {
         // Escuchar el evento para actualizar torres
         onTorreColocada((data) => {
             const { x, y, tipo } = data;
-            this.tower.placeTower(x, y); // Colocar la torre en la vista
+            this.tower.placeTower(x, y, tipo); // Colocar la torre en la vista
         });
 
         // Escuchar el evento para recibir el estado inicial de las torres

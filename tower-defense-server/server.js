@@ -317,8 +317,11 @@ io.on('connection', (socket) => {
         if (!roomCode || !rooms[roomCode]) return;
 
         const { x, y, tipo } = data;
-        rooms[roomCode].gameState.torres.push({ x, y, tipo });
-        io.to(roomCode).emit('torre-colocada', { x, y, tipo });
+        // Validar que el tipo de torre es válido
+        const validTypes = ['basic', 'sniper', 'rapid'];
+        const towerType = validTypes.includes(tipo) ? tipo : 'basic';
+        rooms[roomCode].gameState.torres.push({ x, y, tipo: towerType });
+        io.to(roomCode).emit('torre-colocada', { x, y, tipo: towerType });
     });
 
     socket.on('disparar-proyectil', (data) => {

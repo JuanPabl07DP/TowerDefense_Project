@@ -49,8 +49,8 @@ export default class Tower {
     }
 
     // Método para colocar una torre
-    placeTower(col, row) {
-        const towerType = this.towerTypes[this.selectedTowerType];
+    placeTower(col, row, type = this.selectedTowerType) {
+        const towerType = this.towerTypes[type] || this.towerTypes.basic;
         if (this.map.getTileValue(row, col) === 1) {
             // Obtener la posición en la pantalla para esta casilla
             const position = this.map.getTilePosition(row, col);
@@ -85,7 +85,7 @@ export default class Tower {
                 col: col,
                 position: position,
                 lastShot: 0,
-                type: this.selectedTowerType,
+                type: type,
                 config: towerType
             });
 
