@@ -1,6 +1,9 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -15,6 +18,9 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+
+// Nuevas rutas de autenticación
+app.use('/auth', authRoutes);
 
 // Servir archivos estáticos en producción
 if (isProduction) {

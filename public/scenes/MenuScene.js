@@ -1,6 +1,9 @@
+import {authService} from "../services/AuthService";
+
 export default class MenuScene extends Phaser.Scene {
     constructor() {
         super({ key: 'MenuScene' });
+        this.authService = authService; // Importa authService
     }
 
     preload() {
@@ -9,6 +12,11 @@ export default class MenuScene extends Phaser.Scene {
     }
 
     create() {
+        if (!this.authService.isAuthenticated()) {
+            this.scene.start('LoginScene');
+            return;
+        }
+
         // Obtener dimensiones de la pantalla
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;

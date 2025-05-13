@@ -6,13 +6,26 @@ import SettingsScene from './scenes/SettingsScene.js';
 import LobbyScene from './scenes/LobbyScene.js';
 import RoomCreationScene from './scenes/RoomCreationScene.js';
 import JoinRoomScene from './scenes/JoinRoomScene.js';
+import LoginScene from "./scenes/LoginScene";
+import ConfirmationScene from "./scenes/ConfirmationScene";
+import RegisterScene from "./scenes/RegisterScene";
 
 // Configuración del juego
 const config = {
     type: Phaser.AUTO,
+    parent: 'game-container', // Asegúrate de tener este contenedor en tu HTML
+    dom: {
+        createContainer: true // ¡Esta línea es crucial!
+    },
+    input: {
+        activePointers: 3 // Asegura que reconozca clicks táctiles/mouse
+    },
     width: window.innerWidth,
     height: window.innerHeight,
     scene: [
+        LoginScene,
+        ConfirmationScene,
+        RegisterScene,
         MenuScene,
         MusicScene,
         GameScene,
