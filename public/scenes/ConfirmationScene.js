@@ -1,3 +1,5 @@
+import { authService } from '../services/authService';
+
 export default class ConfirmationScene extends Phaser.Scene {
     constructor() {
         super({ key: 'ConfirmationScene' });

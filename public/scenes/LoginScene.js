@@ -27,16 +27,29 @@ export default class LoginScene extends Phaser.Scene {
             fill: '#ffffff'
         }).setOrigin(0.5);
 
-        // Campos de entrada
+        // Label Email
+        this.add.text(width / 2 - 150, height / 2 - 85, 'Email:', {
+            fontSize: '16px',
+            fill: '#ffffff'
+        });
+
+        // Campo Email
         this.emailInput = this.add.dom(width / 2, height / 2 - 60).createElement('input', {
             type: 'email',
-            placeholder: 'Email',
+            placeholder: 'ejemplo@email.com',
             style: 'width: 300px; height: 40px; padding: 0 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc;'
         });
 
+        // Label Contraseña
+        this.add.text(width / 2 - 150, height / 2 - 25, 'Contraseña:', {
+            fontSize: '16px',
+            fill: '#ffffff'
+        });
+
+        // Campo Contraseña
         this.passwordInput = this.add.dom(width / 2, height / 2).createElement('input', {
             type: 'password',
-            placeholder: 'Contraseña',
+            placeholder: '••••••••',
             style: 'width: 300px; height: 40px; padding: 0 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc;'
         });
 
