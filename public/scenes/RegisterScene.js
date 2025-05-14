@@ -6,116 +6,149 @@ export default class RegisterScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('register_background', 'assets/fondo.jpeg');
+        this.load.image('register_bg', 'assets/fondoLoginRegister.jpg');
     }
 
     create() {
         const { width, height } = this.cameras.main;
 
-        // Fondo
-        this.add.image(width / 2, height / 2, 'register_background')
-            .setDisplaySize(width, height);
+        // Fondo animado
+        this.bg = this.add.tileSprite(0, 0, width, height, 'register_bg')
+            .setOrigin(0, 0)
+            .setScrollFactor(0)
+            .setAlpha(0.8);
 
-        // Panel de registro
+        // Panel de formulario con sombra
+        const panel = this.add.graphics()
+            .fillStyle(0x333333, 0.85)
+            .fillRoundedRect(width/2 - 250, height/2 - 300, 500, 600, 20)
+            .setDepth(0);
+
+        // Efecto de borde
         this.add.graphics()
-            .fillStyle(0x333333, 0.8)
-            .fillRoundedRect(width / 2 - 200, height / 2 - 180, 400, 400, 10);
+            .lineStyle(4, 0x4CAF50, 0.7)
+            .strokeRoundedRect(width/2 - 250, height/2 - 300, 500, 600, 20);
 
-        // Título
-        this.add.text(width / 2, height / 2 - 150, 'Registro', {
-            fontSize: '24px',
-            fill: '#ffffff'
+        // Título con gradiente (simulado)
+        const title = this.add.text(width/2, height/2 - 220, 'CREAR CUENTA', {
+            fontFamily: 'Arial',
+            fontSize: '36px',
+            fontWeight: 'bold',
+            color: '#4CAF50',
+            stroke: '#FFFFFF',
+            strokeThickness: 2,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#000000',
+                blur: 3,
+                stroke: true
+            }
         }).setOrigin(0.5);
 
-        // Label Email
-        this.add.text(width / 2 - 150, height / 2 - 115, 'Email:', {
-            fontSize: '16px',
-            fill: '#ffffff'
-        });
-
-        // Campo Email
-        this.emailInput = this.add.dom(width / 2, height / 2 - 90).createElement('input', {
-            type: 'email',
-            placeholder: 'ejemplo@email.com',
-            style: 'width: 300px; height: 40px; padding: 0 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc;'
-        });
-
-        // Label Nombre de Usuario
-        this.add.text(width / 2 - 150, height / 2 - 55, 'Nombre:', {
-            fontSize: '16px',
-            fill: '#ffffff'
-        });
-
-        // Campo Nombre de Usuario
-        this.usernameInput = this.add.dom(width / 2, height / 2 - 30).createElement('input', {
-            type: 'text',
-            placeholder: 'Tu nombre de usuario',
-            style: 'width: 300px; height: 40px; padding: 0 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc;'
-        });
-
-        // Label Contraseña
-        this.add.text(width / 2 - 150, height / 2 + 5, 'Contraseña:', {
-            fontSize: '16px',
-            fill: '#ffffff'
-        });
-
-        // Campo Contraseña
-        this.passwordInput = this.add.dom(width / 2, height / 2 + 30).createElement('input', {
-            type: 'password',
-            placeholder: 'Mínimo 8 caracteres',
-            style: 'width: 300px; height: 40px; padding: 0 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc;'
-        });
-
-        // Label Confirmar Contraseña
-        this.add.text(width / 2 - 150, height / 2 + 65, 'Confirmar:', {
-            fontSize: '16px',
-            fill: '#ffffff'
-        });
-
-        // Campo Confirmar Contraseña
-        this.confirmPasswordInput = this.add.dom(width / 2, height / 2 + 90).createElement('input', {
-            type: 'password',
-            placeholder: 'Repite tu contraseña',
-            style: 'width: 300px; height: 40px; padding: 0 10px; font-size: 16px; border-radius: 5px; border: 1px solid #ccc;'
-        });
+        // Campos del formulario (asignados directamente a propiedades)
+        this.nameInput = this.createInputField(width/2, height/2 - 140, '👤 Nombre Completo:', 'text', 'Ej: Juan Pérez');
+        this.emailInput = this.createInputField(width/2, height/2 - 80, '✉️ Correo Electrónico:', 'email', 'tucorreo@ejemplo.com');
+        this.passwordInput = this.createInputField(width/2, height/2 - 20, '🔒 Contraseña:', 'password', 'Mínimo 8 caracteres');
+        this.confirmPasswordInput = this.createInputField(width/2, height/2 + 40, '🔁 Confirmar Contraseña:', 'password', 'Repite tu contraseña');
 
         // Botón de registro
-        this.registerButton = this.add.rectangle(width / 2, height / 2 + 140, 160, 40, 0x2196F3)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.handleRegister())
-            .on('pointerover', () => this.registerButton.setFillStyle(0x1976D2))
-            .on('pointerout', () => this.registerButton.setFillStyle(0x2196F3));
+        this.registerBtn = this.add.graphics()
+            .fillStyle(0x4CAF50, 1)
+            .fillRoundedRect(width/2 - 110, height/2 + 100, 220, 55, 10)
+            .setInteractive(new Phaser.Geom.Rectangle(width/2 - 110, height/2 + 100, 220, 55),
+                Phaser.Geom.Rectangle.Contains)
+            .on('pointerover', () => {
+                this.registerBtn.clear()
+                    .fillStyle(0x81C784, 1)
+                    .fillRoundedRect(width/2 - 110, height/2 + 100, 220, 55, 10);
+                this.registerText.setColor('#FFFFFF');
+            })
+            .on('pointerout', () => {
+                this.registerBtn.clear()
+                    .fillStyle(0x4CAF50, 1)
+                    .fillRoundedRect(width/2 - 110, height/2 + 100, 220, 55, 10);
+                this.registerText.setColor('#FFFFFF');
+            })
+            .on('pointerdown', () => this.handleRegister());
 
-        this.add.text(width / 2, height / 2 + 140, 'Registrarse', {
-            fontSize: '18px',
-            fill: '#ffffff'
+        this.registerText = this.add.text(width/2, height/2 + 128, 'REGISTRARSE', {
+            fontSize: '20px',
+            color: '#FFFFFF',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
         // Botón de volver
-        this.backText = this.add.text(width / 2, height / 2 + 190, 'Volver a inicio de sesión', {
-            fontSize: '16px',
-            fill: '#2196F3',
-            fontStyle: 'bold'
-        })
-            .setOrigin(0.5)
-            .setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => this.scene.start('LoginScene'))
-            .on('pointerover', () => this.backText.setColor('#1976D2'))
-            .on('pointerout', () => this.backText.setColor('#2196F3'));
+        this.backBtn = this.add.graphics()
+            .fillStyle(0x333333, 1)
+            .fillRoundedRect(width/2 - 90, height/2 + 170, 180, 45, 10)
+            .setInteractive(new Phaser.Geom.Rectangle(width/2 - 90, height/2 + 170, 180, 45),
+                Phaser.Geom.Rectangle.Contains)
+            .on('pointerover', () => {
+                this.backBtn.clear()
+                    .fillStyle(0x454545, 1)
+                    .fillRoundedRect(width/2 - 90, height/2 + 170, 180, 45, 10);
+                this.backText.setColor('#81C784');
+            })
+            .on('pointerout', () => {
+                this.backBtn.clear()
+                    .fillStyle(0x333333, 1)
+                    .fillRoundedRect(width/2 - 90, height/2 + 170, 180, 45, 10);
+                this.backText.setColor('#4CAF50');
+            })
+            .on('pointerdown', () => this.scene.start('LoginScene'));
 
-        // Habilitar tecla Enter
-        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        this.enterKey.on('down', () => this.handleRegister());
+        this.backText = this.add.text(width/2, height/2 + 193, 'VOLVER', {
+            fontSize: '18px',
+            color: '#4CAF50',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        // Efecto de entrada
+        // this.tweens.add({
+        //     targets: panel,
+        //     scale: { from: 0.9, to: 1 },
+        //     alpha: { from: 0, to: 1 },
+        //     duration: 800,
+        //     ease: 'Elastic.easeOut'
+        // });
+    }
+
+    createInputField(x, y, labelText, type, placeholder) {
+        // Label
+        this.add.text(x - 190, y - 25, labelText, {
+            fontSize: '16px',
+            fill: '#E0E0E0'
+        });
+
+        // Campo de entrada
+        const input = this.add.dom(x, y).createElement('input', {
+            type: type,
+            placeholder: placeholder,
+            style: `width: 350px; height: 45px; padding: 0 15px;
+                    font-size: 16px; border-radius: 8px;
+                    border: 2px solid #4CAF50; background: rgba(255,255,255,0.95);
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    transition: all 0.3s ease;`
+        });
+
+        return input;
     }
 
     async handleRegister() {
-        const email = this.emailInput.node.value.trim();
-        const username = this.usernameInput.node.value.trim();
+        // Verificación de seguridad
+        if (!this.nameInput || !this.emailInput || !this.passwordInput || !this.confirmPasswordInput) {
+            console.error('Error: Campos de entrada no inicializados');
+            this.showError('Error interno. Por favor recarga la página.');
+            return;
+        }
+
+        const name = this.nameInput.node.value;
+        const email = this.emailInput.node.value;
         const password = this.passwordInput.node.value;
         const confirmPassword = this.confirmPasswordInput.node.value;
 
-        // Validaciones
-        if (!email || !username || !password || !confirmPassword) {
+        if (!name || !email || !password || !confirmPassword) {
             this.showError('Por favor completa todos los campos');
             return;
         }
@@ -135,50 +168,26 @@ export default class RegisterScene extends Phaser.Scene {
             return;
         }
 
-        this.showLoading(true);
-
         try {
-            const result = await authService.register(email, password, username);
+            const result = await authService.register(email, password, name);
 
             if (result.success) {
                 this.scene.start('ConfirmationScene', {
-                    email,
-                    message: 'Se envió un código de confirmación a tu email'
+                    email: email,
+                    message: 'Se envió un código de verificación a tu email'
                 });
             } else {
-                this.showError(result.error);
+                this.showError(result.error || 'Error al registrarse');
             }
         } catch (error) {
             console.error('Registration error:', error);
             this.showError('Error de conexión. Intenta nuevamente.');
-        } finally {
-            this.showLoading(false);
         }
     }
 
     validateEmail(email) {
         const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return re.test(email);
-    }
-
-    showLoading(show) {
-        const { width, height } = this.cameras.main; // Obtener dimensiones aquí
-
-        if (!this.loadingIndicator) {
-            this.loadingIndicator = this.add.rectangle(
-                width / 2, height / 2 + 220,
-                200, 40, 0x333333
-            ).setDepth(10);
-
-            this.loadingText = this.add.text(
-                width / 2, height / 2 + 220,
-                'Procesando...',
-                { fontSize: '16px', fill: '#ffffff' }
-            ).setOrigin(0.5).setDepth(10);
-        }
-
-        this.loadingIndicator.setVisible(show);
-        this.loadingText.setVisible(show);
     }
 
     showError(message) {
