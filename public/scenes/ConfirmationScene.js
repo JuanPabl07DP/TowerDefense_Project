@@ -6,7 +6,7 @@ export default class ConfirmationScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('confirm_bg', 'assets/fondoLoginRegister.jpg');
+        this.load.image('confirm_bg', 'assets/login.jpeg');
     }
 
     create(data) {

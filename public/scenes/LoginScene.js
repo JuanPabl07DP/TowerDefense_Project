@@ -6,10 +6,19 @@ export default class LoginScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('login_bg', 'assets/fondoLoginRegister.jpg');
+        this.load.image('login_bg', './assets/login.jpeg');
     }
 
     create() {
+        // Lanzar la escena de música al inicio
+        this.scene.launch('MusicScene');
+
+        // Detectar la primera interacción para activar la música
+        this.input.once('pointerdown', () => {
+            // Emitir el evento global de interacción
+            this.game.events.emit('global-interaction');
+        });
+
         const { width, height } = this.cameras.main;
 
         // Fondo con efecto de paralaje
@@ -68,7 +77,11 @@ export default class LoginScene extends Phaser.Scene {
                     .fillRoundedRect(width/2 - 100, height/2 + 60, 200, 50, 10);
                 this.loginText.setColor('#FFFFFF');
             })
-            .on('pointerdown', () => this.handleLogin());
+            .on('pointerdown', () => {
+                // Activar música si no está activa ya
+                this.game.events.emit('global-interaction');
+                this.handleLogin();
+            });
 
         this.loginText = this.add.text(width/2, height/2 + 85, 'INGRESAR', {
             fontSize: '20px',
@@ -92,7 +105,11 @@ export default class LoginScene extends Phaser.Scene {
                 this.registerLink.setColor('#4CAF50');
                 this.registerLink.setStyle({ fontSize: '16px' });
             })
-            .on('pointerdown', () => this.scene.start('RegisterScene'));
+            .on('pointerdown', () => {
+                // Activar música si no está activa ya
+                this.game.events.emit('global-interaction');
+                this.scene.start('RegisterScene');
+            });
 
         // Animación de entrada
         // this.tweens.add({
@@ -116,11 +133,19 @@ export default class LoginScene extends Phaser.Scene {
             type: type,
             placeholder: placeholder,
             style: `width: 300px; height: 45px; padding: 0 15px;
-                    font-size: 16px; border-radius: 8px;
-                    border: 2px solid #4CAF50; background: rgba(255,255,255,0.9);
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                    transition: all 0.3s ease;`
+                font-size: 16px; border-radius: 8px;
+                border: 2px solid #4CAF50; background: rgba(255,255,255,0.9);
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                -webkit-text-security: disc; /* Fuerza el ocultamiento */
+                text-security: disc;`
         });
+
+        // Forzar el tipo después de la creación (importante)
+        if (type === 'password') {
+            input.node.type = 'password';
+            input.node.setAttribute('type', 'password');
+        }
 
         return input;
     }

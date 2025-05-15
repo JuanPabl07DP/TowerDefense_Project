@@ -13,37 +13,69 @@ export default class MusicScene extends Phaser.Scene {
 
         // Si no existe, crearla
         if (!music) {
-            // Preparar la música e iniciarla silenciada
+            // Crear la música con volumen inicial (cambio principal aquí)
             music = this.sound.add('background_music', {
-                volume: 0,  // Iniciar con volumen 0
+                volume: 0.4,  // Cambio de 0 a 0.4 para que suene desde el inicio
                 loop: true
             });
 
-            // Reproducir inmediatamente (permitido porque está silenciado)
-            music.play();
-
             // Guardar referencia en el registro global
             this.registry.set('backgroundMusic', music);
-
-            // Inicializar el estado de silenciado por usuario como falso
             this.registry.set('musicMutedByUser', false);
 
-            // Crear un evento global para activar el audio
-            this.game.events.once('global-interaction', () => {
-                // Solo aumentar el volumen si el usuario no lo silenció intencionalmente
-                if (!this.registry.get('musicMutedByUser')) {
-                    this.tweens.add({
-                        targets: music,
-                        volume: 0.4,
-                        duration: 1000
-                    });
-                }
-            });
+            // Intentar reproducir inmediatamente
+            try {
+                music.play();
+            } catch (error) {
+                // Si no se puede reproducir (por políticas del navegador)
+                // Esperar a la primera interacción del usuario
+                console.log('La música necesita interacción del usuario para reproducirse');
+
+                // Crear un evento global para la primera interacción
+                this.game.events.once('global-interaction', () => {
+                    if (!this.registry.get('musicMutedByUser')) {
+                        music.play();
+                    }
+                });
+            }
         }
 
         // Asegurarse de que la música siga reproduciéndose si la escena se reinicia
-        if (music.isPaused) {
+        if (music.isPaused && !this.registry.get('musicMutedByUser')) {
             music.resume();
+        }
+
+        // Escuchar si el contexto de audio se suspende (común en navegadores móviles)
+        if (this.sound.context) {
+            // Función para reanudar el contexto de audio cuando sea necesario
+            const resumeAudio = () => {
+                if (this.sound.context.state === 'suspended') {
+                    this.sound.context.resume();
+                }
+            };
+
+            // Intentar reanudar el contexto en varias interacciones
+            this.input.on('pointerdown', resumeAudio);
+            this.input.on('pointerup', resumeAudio);
+        }
+
+        // Debug: Mostrar estado de la música (opcional, puedes comentar esto)
+        if (music) {
+            console.log('Estado de la música:', {
+                isPlaying: music.isPlaying,
+                volume: music.volume,
+                contextState: this.sound.context ? this.sound.context.state : 'no disponible'
+            });
+        }
+    }
+
+    // Método para activar la música cuando reciba el evento global
+    enableMusic() {
+        const music = this.registry.get('backgroundMusic');
+        const musicMuted = this.registry.get('musicMutedByUser');
+
+        if (music && !musicMuted && !music.isPlaying) {
+            music.play();
         }
     }
 }

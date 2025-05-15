@@ -126,11 +126,19 @@ export default class RegisterScene extends Phaser.Scene {
             type: type,
             placeholder: placeholder,
             style: `width: 350px; height: 45px; padding: 0 15px;
-                    font-size: 16px; border-radius: 8px;
-                    border: 2px solid #4CAF50; background: rgba(255,255,255,0.95);
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                    transition: all 0.3s ease;`
+                font-size: 16px; border-radius: 8px;
+                border: 2px solid #4CAF50; background: rgba(255,255,255,0.95);
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                transition: all 0.3s ease;
+                -webkit-text-security: disc;
+                text-security: disc;`
         });
+
+        // Forzar el tipo después de la creación
+        if (type === 'password') {
+            input.node.type = 'password';
+            input.node.setAttribute('type', 'password');
+        }
 
         return input;
     }
