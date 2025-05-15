@@ -1,5 +1,4 @@
-// scenes/RoomCreationScene.js
-import { createRoom, startGame, onPlayerJoined, onPlayerLeft, onGameStarted } from '../services/socketService.js';
+import { createRoom, startGame, onPlayerJoined, onPlayerLeft, onGameStarted, leaveRoom, socket } from '../services/socketService.js';
 
 export default class RoomCreationScene extends Phaser.Scene {
     constructor() {
@@ -128,12 +127,16 @@ export default class RoomCreationScene extends Phaser.Scene {
 
         player2Container.add([player2Frame, player2Text, player2Image, player2Status]);
 
-        // Botón para volver
+        // Botón para volver - ACTUALIZADO con limpieza
         this.createButton(
             width * 0.15,
             height * 0.9,
             'Volver',
-            () => this.scene.start('LobbyScene')
+            () => {
+                // Limpiar la sala antes de volver
+                this.cleanUpRoom();
+                this.scene.start('LobbyScene');
+            }
         );
 
         // Iniciar conexión con servidor
@@ -265,6 +268,35 @@ export default class RoomCreationScene extends Phaser.Scene {
         }
     }
 
+    cleanUpRoom() {
+        console.log('Limpiando sala...', this.roomCode);
+
+        // Si tenemos un código de sala, notificar al servidor que abandonamos
+        if (this.roomCode) {
+            try {
+                leaveRoom(this.roomCode);
+                console.log('Sala abandonada:', this.roomCode);
+            } catch (error) {
+                console.log('Error al abandonar sala:', error);
+            }
+        }
+
+        // Limpiar listeners de eventos para evitar duplicados
+        if (socket) {
+            socket.off('playerJoined');
+            socket.off('playerLeft');
+            socket.off('gameStarted');
+            socket.off('roomCreated');
+            socket.off('joinError');
+            console.log('Listeners limpiados');
+        }
+
+        // Limpiar variables locales
+        this.roomCode = null;
+        this.playerId = null;
+        this.isJoining = false;
+    }
+
     createButton(x, y, text, callback, disabled = false) {
         const buttonWidth = 220;
         const buttonHeight = 50;
@@ -353,7 +385,7 @@ export default class RoomCreationScene extends Phaser.Scene {
         }
     }
 
-    // Método para mostrar mensaje de desconexión
+    // ACTUALIZADO: Método para mostrar mensaje de desconexión con verificaciones mejoradas
     showDisconnectionMessage(message) {
         // Verificar que la escena esté activa
         if (!this.scene || !this.scene.isActive('RoomCreationScene')) {

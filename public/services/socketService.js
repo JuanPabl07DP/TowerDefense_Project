@@ -152,3 +152,4 @@ export function onActualizarMonedas(callback) {
     socket.off('actualizar-monedas'); // Evitar duplicados
     socket.on('actualizar-monedas', callback);
 }
+export { socket };
