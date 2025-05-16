@@ -21,7 +21,7 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('tower_sniper', 'assets/sniper.png');
         this.load.image('tower_rapid', 'assets/doble.png');
         this.load.image('enemy', 'assets/miniogro.gif');
-        this.load.image('enemy_strong', 'assets/enemy_strong.png');
+        this.load.image('enemy_strong', 'assets/GIF.gif');
         this.load.image('enemy_fast', 'assets/enemy_fast.png');
         this.load.image('water', 'assets/agua.jpg');
         this.load.image('tree', 'assets/arbol.png');
