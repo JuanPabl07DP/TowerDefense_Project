@@ -10,6 +10,18 @@ import { leaveRoom } from '../services/socketService';
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
+
+        // Estadísticas de juego
+        this.gameStats = {
+            towersBuilt: { basic: 0, sniper: 0, rapid: 0, total: 0 },
+            enemiesKilled: { basic: 0, fast: 0, strong: 0, total: 0 },
+            moneySpent: 0,
+            moneyEarned: 0,
+            castleDamage: 0,
+            wavesSurvived: 0,
+            playTime: 0,
+            gameResult: null // 'victory' o 'defeat'
+        };
     }
 
     preload() {
@@ -17,12 +29,12 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('grass', 'assets/grass.jpg');
         this.load.image('path', 'assets/camino.png');
         this.load.image('base', 'assets/puerta.jpeg');
-        this.load.image('tower', 'assets/A_stone_tower_with_a_door_and_a_window-removebg-preview.png');
-        this.load.image('tower_sniper', 'assets/sniper2.png');
-        this.load.image('tower_rapid', 'assets/doble.png');
+        this.load.image('tower', 'assets/tower.png');
+        this.load.image('tower_sniper', 'assets/tower_sniper.png');
+        this.load.image('tower_rapid', 'assets/tower_rapid.png');
         this.load.image('enemy', 'assets/miniogro.gif');
-        this.load.image('enemy_strong', 'assets/GIF.gif');
-        this.load.image('enemy_fast', 'assets/mountro.gif');
+        this.load.image('enemy_strong', 'assets/enemy_strong.png');
+        this.load.image('enemy_fast', 'assets/enemy_fast.png');
         this.load.image('water', 'assets/agua.jpg');
         this.load.image('tree', 'assets/arbol.png');
         this.load.image('rock', 'assets/roca.png');
@@ -44,8 +56,14 @@ export default class GameScene extends Phaser.Scene {
 
         // Hacer que las funciones de socket sean accesibles desde otras clases
         this.colocarTorre = colocarTorre;
-        this.gastarMonedas = gastarMonedas;
-        this.agregarMonedas = agregarMonedas;
+        this.gastarMonedas = (cantidad) => {
+            gastarMonedas(cantidad);
+            this.gameStats.moneySpent += cantidad;
+        };
+        this.agregarMonedas = (cantidad) => {
+            agregarMonedas(cantidad);
+            this.gameStats.moneyEarned += cantidad;
+        };
 
         // Hacer accesible la función para eliminar enemigos
         this.eliminarEnemigo = (enemigoId) => {
@@ -232,6 +250,9 @@ export default class GameScene extends Phaser.Scene {
         onTorreColocada((data) => {
             const { x, y, tipo } = data;
             this.tower.placeTower(x, y, tipo); // Colocar la torre en la vista
+            // Actualizar estadísticas
+            this.gameStats.towersBuilt[tipo || 'basic']++;
+            this.gameStats.towersBuilt.total++;
         });
 
         // Escuchar el evento para recibir el estado inicial de las torres
@@ -263,6 +284,9 @@ export default class GameScene extends Phaser.Scene {
             console.log("Nueva oleada recibida:", oleada);
             this.enemyManager.oleadaActual = oleada;
             this.enemyManager.oleadaEnCurso = true;
+
+            // Actualizar estadísticas
+            this.gameStats.wavesSurvived = oleada;
 
             // Actualizar UI si es necesario
             if (this.oleadaText) {
@@ -329,12 +353,28 @@ export default class GameScene extends Phaser.Scene {
         this.events.on('oleada-completada', (oleada) => {
             console.log(`Oleada ${oleada} completada`);
 
-            // Solo mostrar victoria si es la última oleada (4) y no hay enemigos activos
-            if (oleada >= 4 && this.enemyManager.enemies.length === 0) {
+            // Solo mostrar victoria si es la última oleada (6) y no hay enemigos activos
+            if (oleada >= 6 && this.enemyManager.enemies.length === 0) {
                 this.time.delayedCall(1500, () => {
                     this.gameOver(true); // true para victoria
                 });
             }
+        });
+
+        // Eventos para actualizar estadísticas
+        this.events.on('enemigo-eliminado', (tipo) => {
+            this.gameStats.enemiesKilled[tipo]++;
+            this.gameStats.enemiesKilled.total++;
+        });
+
+        // Iniciar el temporizador de juego para estadísticas
+        this.startTime = this.time.now;
+        this.timerEvent = this.time.addEvent({
+            delay: 1000,
+            callback: () => {
+                this.gameStats.playTime++;
+            },
+            loop: true
         });
     }
 
@@ -402,7 +442,7 @@ export default class GameScene extends Phaser.Scene {
                 }
             ).setOrigin(0.5);
 
-            // Añadir detalles de daño y velocidad (nuevo)
+            // Añadir detalles de daño y velocidad
             const dps = (towerType.damage / (towerType.cooldown/1000)).toFixed(2);
             const infoText = this.add.text(
                 buttonWidth/2,
@@ -490,6 +530,9 @@ export default class GameScene extends Phaser.Scene {
     damageCastle(amount) {
         this.castleHealth = Math.max(0, this.castleHealth - amount);
 
+        // Actualizar estadísticas
+        this.gameStats.castleDamage += amount;
+
         // Actualizar barra de vida
         const healthPercent = this.castleHealth / this.castleMaxHealth;
         this.castleHealthBar.width = 150 * healthPercent;
@@ -513,6 +556,13 @@ export default class GameScene extends Phaser.Scene {
 
     // Método para game over
     gameOver(victory) {
+        // Calcular estadísticas finales
+        this.gameStats.gameResult = victory ? 'victory' : 'defeat';
+        this.gameStats.wavesSurvived = this.enemyManager.oleadaActual;
+
+        // Detener el temporizador
+        if (this.timerEvent) this.timerEvent.remove();
+
         // Añadir la imagen de fin como fondo
         const finBackground = this.add.image(
             this.cameras.main.width / 2,
@@ -582,7 +632,7 @@ export default class GameScene extends Phaser.Scene {
         const buttonText = this.add.text(
             buttonX,
             buttonY,
-            'Volver al Menú',
+            'Ver Estadísticas',
             {
                 font: `bold ${Math.max(16, Math.floor(22 * scaleRatio))}px Arial`,
                 fill: '#ffffff',
@@ -602,9 +652,9 @@ export default class GameScene extends Phaser.Scene {
                 button.lineStyle(3, 0x664433, 1);
                 button.strokeRect(buttonRectX, buttonRectY, buttonWidth, buttonHeight);
 
-                // Llamar a la función de retorno al menú después de un pequeño retraso
+                // Mostrar estadísticas después de un pequeño retraso
                 this.time.delayedCall(150, () => {
-                    this.cleanupGameAndLeaveRoom();
+                    this.showGameStats();
                 });
             })
             .on('pointerover', () => {
@@ -638,8 +688,253 @@ export default class GameScene extends Phaser.Scene {
                 );
             });
     }
+    // Método para mostrar estadísticas de juego
+    showGameStats() {
+        // Eliminar elementos anteriores
+        this.children.each(child => {
+            if (child.depth >= 99) {
+                child.destroy();
+            }
+        });
+
+        // Crear un fondo semitransparente
+        const statsBg = this.add.rectangle(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            this.cameras.main.width * 0.8,
+            this.cameras.main.height * 0.8,
+            0x000000,
+            0.9
+        ).setScrollFactor(0).setDepth(2000);
+
+        // Título
+        const title = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height * 0.15,
+            'ESTADÍSTICAS DE JUEGO',
+            {
+                fontSize: '36px',
+                fontStyle: 'bold',
+                fill: '#FFFFFF',
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
+
+        // Subtítulo con el resultado
+        const subtitle = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height * 0.22,
+            this.gameStats.gameResult === 'victory' ? '¡VICTORIA!' : 'DERROTA',
+            {
+                fontSize: '28px',
+                fontStyle: 'bold',
+                fill: this.gameStats.gameResult === 'victory' ? '#00FF00' : '#FF0000',
+                stroke: '#000000',
+                strokeThickness: 3
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(2001);
+
+        // Formatear tiempo
+        const formatTime = (seconds) => {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+        };
+
+        // Crear tabla de estadísticas
+        const stats = [
+            [`Tiempo jugado:`, `${formatTime(this.gameStats.playTime)}`],
+            [`Oleadas superadas:`, `${this.gameStats.wavesSurvived} de 6`],
+            [`Daño al castillo:`, `${this.gameStats.castleDamage}`],
+            [`Monedas gastadas:`, `${this.gameStats.moneySpent}`],
+            [`Monedas ganadas:`, `${this.gameStats.moneyEarned}`],
+            [`Torres construidas:`, ``],
+            [`• Básica:`, `${this.gameStats.towersBuilt.basic}`],
+            [`• Sniper:`, `${this.gameStats.towersBuilt.sniper}`],
+            [`• Rápida:`, `${this.gameStats.towersBuilt.rapid}`],
+            [`• Total:`, `${this.gameStats.towersBuilt.total}`],
+            [`Enemigos eliminados:`, ``],
+            [`• Básicos:`, `${this.gameStats.enemiesKilled.basic}`],
+            [`• Fuertes:`, `${this.gameStats.enemiesKilled.strong}`],
+            [`• Rápidos:`, `${this.gameStats.enemiesKilled.fast}`],
+            [`• Total:`, `${this.gameStats.enemiesKilled.total}`]
+        ];
+
+        // Crear textos de estadísticas en dos columnas
+        const startY = this.cameras.main.height * 0.3;
+        const lineHeight = 30;
+        const column1X = this.cameras.main.width * 0.3;
+        const column2X = this.cameras.main.width * 0.7;
+
+        stats.forEach((stat, index) => {
+            // Etiqueta (columna izquierda)
+            this.add.text(
+                column1X,
+                startY + index * lineHeight,
+                stat[0],
+                {
+                    fontSize: '18px',
+                    fill: '#FFFFFF',
+                    align: 'right'
+                }
+            ).setOrigin(1, 0.5).setScrollFactor(0).setDepth(2001);
+
+            // Valor (columna derecha)
+            if (stat[1] !== '') {
+                this.add.text(
+                    column2X,
+                    startY + index * lineHeight,
+                    stat[1],
+                    {
+                        fontSize: '18px',
+                        fontStyle: 'bold',
+                        fill: '#FFFFFF',
+                        align: 'left'
+                    }
+                ).setOrigin(0, 0.5).setScrollFactor(0).setDepth(2001);
+            }
+        });
+
+        // Botón para volver al menú
+        const buttonX = this.cameras.main.width / 2;
+        const buttonY = this.cameras.main.height * 0.85;
+        const buttonWidth = 220;
+        const buttonHeight = 50;
+
+        // Calcular valores para bordes
+        const scaleRatio = Math.min(this.cameras.main.width / 1280, this.cameras.main.height / 720);
+        const borderThickness = Math.max(1, Math.floor(2 * scaleRatio));
+        const borderOffset = Math.max(2, Math.floor(3 * scaleRatio));
+
+        // Fondo del botón
+        const buttonBg = this.add.graphics();
+        buttonBg.fillStyle(0xA67C52, 1);
+        buttonBg.lineStyle(3, 0x664433, 1);
+        buttonBg.fillRect(
+            buttonX - buttonWidth / 2,
+            buttonY - buttonHeight / 2,
+            buttonWidth,
+            buttonHeight
+        );
+        buttonBg.strokeRect(
+            buttonX - buttonWidth / 2,
+            buttonY - buttonHeight / 2,
+            buttonWidth,
+            buttonHeight
+        );
+
+        // Borde interior
+        buttonBg.lineStyle(borderThickness, 0xD4A76A, 1);
+        buttonBg.strokeRect(
+            buttonX - buttonWidth / 2 + borderOffset,
+            buttonY - buttonHeight / 2 + borderOffset,
+            buttonWidth - (borderOffset * 2),
+            buttonHeight - (borderOffset * 2)
+        );
+
+        buttonBg.setScrollFactor(0).setDepth(2001);
+
+        // Texto del botón
+        const buttonText = this.add.text(
+            buttonX,
+            buttonY,
+            'Volver al Menú',
+            {
+                fontSize: '20px',
+                fill: '#FFFFFF',
+                fontStyle: 'bold'
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(2002);
+
+        // Hacer el botón interactivo
+        const hitArea = new Phaser.Geom.Rectangle(
+            buttonX - buttonWidth / 2,
+            buttonY - buttonHeight / 2,
+            buttonWidth,
+            buttonHeight
+        );
+
+        buttonBg.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains)
+            .on('pointerdown', () => {
+                // Efecto de botón presionado
+                buttonBg.clear();
+                buttonBg.fillStyle(0x7A5C32, 1);
+                buttonBg.fillRect(
+                    buttonX - buttonWidth / 2,
+                    buttonY - buttonHeight / 2,
+                    buttonWidth,
+                    buttonHeight
+                );
+                buttonBg.lineStyle(3, 0x664433, 1);
+                buttonBg.strokeRect(
+                    buttonX - buttonWidth / 2,
+                    buttonY - buttonHeight / 2,
+                    buttonWidth,
+                    buttonHeight
+                );
+
+                // Volver al menú
+                this.time.delayedCall(150, () => {
+                    this.cleanupGameAndLeaveRoom();
+                });
+            })
+            .on('pointerover', () => {
+                // Efecto hover
+                buttonBg.clear();
+                buttonBg.fillStyle(0xBB9062, 1);
+                buttonBg.fillRect(
+                    buttonX - buttonWidth / 2,
+                    buttonY - buttonHeight / 2,
+                    buttonWidth,
+                    buttonHeight
+                );
+                buttonBg.lineStyle(3, 0x664433, 1);
+                buttonBg.strokeRect(
+                    buttonX - buttonWidth / 2,
+                    buttonY - buttonHeight / 2,
+                    buttonWidth,
+                    buttonHeight
+                );
+                buttonBg.lineStyle(borderThickness, 0xD4A76A, 1);
+                buttonBg.strokeRect(
+                    buttonX - buttonWidth / 2 + borderOffset,
+                    buttonY - buttonHeight / 2 + borderOffset,
+                    buttonWidth - (borderOffset * 2),
+                    buttonHeight - (borderOffset * 2)
+                );
+            })
+            .on('pointerout', () => {
+                // Restaurar estado normal
+                buttonBg.clear();
+                buttonBg.fillStyle(0xA67C52, 1);
+                buttonBg.fillRect(
+                    buttonX - buttonWidth / 2,
+                    buttonY - buttonHeight / 2,
+                    buttonWidth,
+                    buttonHeight
+                );
+                buttonBg.lineStyle(3, 0x664433, 1);
+                buttonBg.strokeRect(
+                    buttonX - buttonWidth / 2,
+                    buttonY - buttonHeight / 2,
+                    buttonWidth,
+                    buttonHeight
+                );
+                buttonBg.lineStyle(borderThickness, 0xD4A76A, 1);
+                buttonBg.strokeRect(
+                    buttonX - buttonWidth / 2 + borderOffset,
+                    buttonY - buttonHeight / 2 + borderOffset,
+                    buttonWidth - (borderOffset * 2),
+                    buttonHeight - (borderOffset * 2)
+                );
+            });
+    }
 
     cleanupGameAndLeaveRoom() {
+        // Detener el temporizador si existe
+        if (this.timerEvent) this.timerEvent.remove();
+
         // Importar socketService localmente para asegurar la referencia
         // Abandonar la sala si existe roomCode
         if (this.roomCode) {

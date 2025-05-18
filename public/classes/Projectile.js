@@ -41,7 +41,10 @@ export default class Projectile {
 
                 if (this.scene.agregarMonedas) {
                     this.scene.agregarMonedas(reward);
+                    this.scene.gameStats.moneyEarned += reward;
                 }
+                this.scene.gameStats.enemiesKilled[this.target.type]++;
+                this.scene.gameStats.enemiesKilled.total++;
 
                 // Notificar al servidor que el enemigo ha sido eliminado
                 // Esto evitará que el servidor envíe un evento onEnemyReachedBase
