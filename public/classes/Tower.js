@@ -14,7 +14,7 @@ export default class Tower {
             'basic': {
                 cost: 20,
                 range: 100,
-                cooldown: 2000,
+                cooldown: 3000,
                 damage: 1,
                 texture: 'tower',
                 projectileTexture: 'projectile',
@@ -23,7 +23,7 @@ export default class Tower {
             'sniper': {
                 cost: 40,
                 range: 180,
-                cooldown: 3500,
+                cooldown: 4000,
                 damage: 3,
                 texture: 'tower_sniper',
                 projectileTexture: 'projectile_sniper',
@@ -32,7 +32,7 @@ export default class Tower {
             'rapid': {
                 cost: 30,
                 range: 80,
-                cooldown: 800,
+                cooldown: 1000,
                 damage: 1,
                 texture: 'tower_rapid',
                 projectileTexture: 'projectile',

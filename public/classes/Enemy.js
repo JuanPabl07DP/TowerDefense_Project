@@ -9,8 +9,8 @@ export default class Enemy {
         // Configuración basada en el tipo de monstruo
         const enemyConfig = {
             'basic': { health: 3, speed: 1, damage: 10, texture: 'enemy', scale: 1.0 },
-            'strong': { health: 6, speed: 0.5, damage: 20, texture: 'enemy_strong', scale: 1.2 },
-            'fast': { health: 2, speed: 1.5, damage: 5, texture: 'enemy_fast', scale: 0.9 }
+            'strong': { health: 12, speed: 0.5, damage: 20, texture: 'enemy_strong', scale: 1.2 },
+            'fast': { health: 2, speed: 2.5, damage: 5, texture: 'enemy_fast', scale: 0.9 }
         };
 
         this.config = enemyConfig[type] || enemyConfig.basic;

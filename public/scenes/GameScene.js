@@ -18,11 +18,11 @@ export default class GameScene extends Phaser.Scene {
         this.load.image('path', 'assets/camino.png');
         this.load.image('base', 'assets/puerta.jpeg');
         this.load.image('tower', 'assets/A_stone_tower_with_a_door_and_a_window-removebg-preview.png');
-        this.load.image('tower_sniper', 'assets/sniper.png');
+        this.load.image('tower_sniper', 'assets/sniper2.png');
         this.load.image('tower_rapid', 'assets/doble.png');
         this.load.image('enemy', 'assets/miniogro.gif');
         this.load.image('enemy_strong', 'assets/GIF.gif');
-        this.load.image('enemy_fast', 'assets/enemy_fast.png');
+        this.load.image('enemy_fast', 'assets/mountro.gif');
         this.load.image('water', 'assets/agua.jpg');
         this.load.image('tree', 'assets/arbol.png');
         this.load.image('rock', 'assets/roca.png');
@@ -402,6 +402,22 @@ export default class GameScene extends Phaser.Scene {
                 }
             ).setOrigin(0.5);
 
+            // Añadir detalles de daño y velocidad (nuevo)
+            const dps = (towerType.damage / (towerType.cooldown/1000)).toFixed(2);
+            const infoText = this.add.text(
+                buttonWidth/2,
+                -20, // Posición encima del botón
+                `Dmg: ${towerType.damage} | DPS: ${dps} | Rango: ${towerType.range}`,
+                {
+                    fontSize: '12px',
+                    color: '#FFFFFF',
+                    backgroundColor: '#000000',
+                    padding: { x: 4, y: 2 },
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }
+            ).setOrigin(0.5).setVisible(false);
+
             // Área interactiva
             const hitArea = this.add.rectangle(
                 buttonWidth/2,
@@ -424,8 +440,23 @@ export default class GameScene extends Phaser.Scene {
                 }
             });
 
+            // Mostrar/ocultar info al pasar el mouse
+            hitArea.on('pointerover', () => {
+                buttonBg.clear()
+                    .fillStyle(this.tower.selectedTowerType === type ? 0x6a9cff : 0x777777, 1)
+                    .fillRoundedRect(0, 0, buttonWidth, buttonHeight, 5);
+                infoText.setVisible(true);
+            });
+
+            hitArea.on('pointerout', () => {
+                buttonBg.clear()
+                    .fillStyle(this.tower.selectedTowerType === type ? 0x4a7cff : 0x555555, 1)
+                    .fillRoundedRect(0, 0, buttonWidth, buttonHeight, 5);
+                infoText.setVisible(false);
+            });
+
             // Añadir elementos al grupo
-            buttonGroup.add([buttonBg, nameText, costText, hitArea]);
+            buttonGroup.add([buttonBg, nameText, costText, hitArea, infoText]);
             this.towerSelectionContainer.add(buttonGroup);
 
             // Guardar referencia para actualización
