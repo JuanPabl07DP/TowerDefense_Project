@@ -6,7 +6,7 @@ export default class RegisterScene extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('register_bg', 'assets/fondoLoginRegister.jpg');
+        this.load.image('register_bg', 'assets/login.jpeg');
     }
 
     create() {
