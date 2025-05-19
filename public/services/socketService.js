@@ -36,7 +36,10 @@ export function joinRoom(roomCode) {
         socket.emit('joinRoom', { roomCode });
 
         // Manejar error (sala no existe o está llena)
-        socket.once('joinError', (error) => {
+        socket.once('joinError', (errorData) => {
+            // Crear un objeto Error y agregar los datos originales
+            const error = new Error(errorData.message || 'Error al unirse a la sala');
+            error.originalError = errorData;
             reject(error);
         });
 
