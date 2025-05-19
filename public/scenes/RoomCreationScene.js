@@ -83,7 +83,7 @@ export default class RoomCreationScene extends Phaser.Scene {
             .setDisplaySize(120, 120);
 
         // Estado del jugador 1
-        const player1Status = this.add.text(0, 80, this.isJoining ? 'Listo ✓' : 'Listo ✓', {
+        const player1Status = this.add.text(0, 80, 'Listo ✓', {
             font: `bold ${Math.max(16, Math.floor(18 * this.scaleRatio))}px Arial`,
             fill: '#00ff00'
         }).setOrigin(0.5);
