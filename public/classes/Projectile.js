@@ -14,51 +14,97 @@ export default class Projectile {
 
     // Método para actualizar la posición del proyectil
     update() {
-        if (this.target && !this.target.sprite.active) {
-            // Si el objetivo ya no existe, destruir el proyectil
+        // Si el objetivo ya no existe, destruir el proyectil
+        if (!this.isTargetValid()) {
             this.destroy();
             return;
         }
 
-        // Calcular la dirección hacia el objetivo
-        const dx = this.target.sprite.x - this.sprite.x;
-        const dy = this.target.sprite.y - this.sprite.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const distance = this.calculateDistanceToTarget();
 
         if (distance > this.speed) {
-            // Mover el proyectil hacia el objetivo
-            this.sprite.x += (dx / distance) * this.speed;
-            this.sprite.y += (dy / distance) * this.speed;
+            this.moveTowardsTarget(distance);
         } else {
-            // El proyectil alcanzó al objetivo
-            const enemyDied = this.target.takeDamage(this.damage);
+            this.hitTarget();
+        }
+    }
 
-            // Si el enemigo murió
-            if (enemyDied) {
-                let reward = 5;
-                if (this.target.type === 'strong') reward = 10;
-                if (this.target.type === 'fast') reward = 8;
+    // Verifica si el objetivo es válido
+    isTargetValid() {
+        return this.target && this.target.sprite && this.target.sprite.active;
+    }
 
-                if (this.scene.agregarMonedas) {
-                    this.scene.agregarMonedas(reward);
-                    this.scene.gameStats.moneyEarned += reward;
-                }
-                this.scene.gameStats.enemiesKilled[this.target.type]++;
-                this.scene.gameStats.enemiesKilled.total++;
+    // Calcula la distancia al objetivo
+    calculateDistanceToTarget() {
+        const dx = this.target.sprite.x - this.sprite.x;
+        const dy = this.target.sprite.y - this.sprite.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
 
-                // Notificar al servidor que el enemigo ha sido eliminado
-                // Esto evitará que el servidor envíe un evento onEnemyReachedBase
-                if (this.scene.eliminarEnemigo) {
-                    this.scene.eliminarEnemigo(this.target.id);
-                }
-            }
+    // Mueve el proyectil hacia el objetivo
+    moveTowardsTarget(distance) {
+        const dx = this.target.sprite.x - this.sprite.x;
+        const dy = this.target.sprite.y - this.sprite.y;
 
-            this.destroy();
+        this.sprite.x += (dx / distance) * this.speed;
+        this.sprite.y += (dy / distance) * this.speed;
+    }
+
+    // Maneja el impacto con el objetivo
+    hitTarget() {
+        const enemyDied = this.target.takeDamage(this.damage);
+
+        if (enemyDied) {
+            this.handleEnemyDeath();
+        }
+
+        this.destroy();
+    }
+
+    // Maneja la lógica cuando un enemigo muere
+    handleEnemyDeath() {
+        const reward = this.calculateReward();
+        this.awardMoney(reward);
+        this.updateGameStats();
+        this.notifyServer();
+    }
+
+    // Calcula la recompensa según el tipo de enemigo
+    calculateReward() {
+        switch (this.target.type) {
+            case 'strong': return 10;
+            case 'fast': return 8;
+            default: return 5;
+        }
+    }
+
+    // Añade monedas al jugador
+    awardMoney(reward) {
+        if (this.scene.agregarMonedas) {
+            this.scene.agregarMonedas(reward);
+            this.scene.gameStats.moneyEarned += reward;
+        }
+    }
+
+    // Actualiza las estadísticas del juego
+    updateGameStats() {
+        if (this.scene.gameStats && this.scene.gameStats.enemiesKilled) {
+            this.scene.gameStats.enemiesKilled[this.target.type]++;
+            this.scene.gameStats.enemiesKilled.total++;
+        }
+    }
+
+    // Notifica al servidor sobre la eliminación del enemigo
+    notifyServer() {
+        if (this.scene.eliminarEnemigo) {
+            this.scene.eliminarEnemigo(this.target.id);
         }
     }
 
     // Método para eliminar el proyectil
     destroy() {
-        this.sprite.destroy();
+        if (this.sprite && this.sprite.active) {
+            this.sprite.destroy();
+        }
     }
 }
