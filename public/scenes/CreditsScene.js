@@ -28,7 +28,7 @@ export default class CreditsScene extends Phaser.Scene {
             stroke: '#000000',
             strokeThickness: Math.max(3, Math.floor(5 * this.scaleRatio))
         };
-        this.add.text(width / 2, height * 0.1, '', titleStyle)
+        this.add.text(width / 2, height * 0.1, 'CRÉDITOS', titleStyle)
             .setOrigin(0.5);
 
         // Añadir información de créditos
@@ -41,6 +41,15 @@ export default class CreditsScene extends Phaser.Scene {
 
         // Puedes personalizar esta parte con los créditos que desees mostrar
         const credits = [
+            'TOWER DEFENSE GAME',
+            '',
+            'Desarrollado por: Juan Pablo Daza Pereiray Nicolas Bernal Fuquene',
+            '',
+            'Programación: Juan Pablo Y Nicolas',
+            'Diseño: Juan Pablo y Nicolas',
+            'Arte: Recursos de terceros',
+            '',
+            'Copyright © 2025 - Todos los derechos reservados'
         ];
 
         // Mostrar los créditos
