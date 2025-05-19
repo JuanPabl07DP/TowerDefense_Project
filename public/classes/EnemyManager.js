@@ -21,9 +21,12 @@ export default class EnemyManager {
             const { id, x, y, currentPoint } = data;
             const enemy = this.enemies.find(e => e.id === id);
             if (enemy) {
-                // Usar las coordenadas exactas enviadas por el servidor, ajustadas por el offset y escala
+                // IMPORTANTE: Convertir coordenadas del servidor a coordenadas del mundo
                 const worldX = this.map.offsetX + (x * this.map.scale);
                 const worldY = this.map.offsetY + (y * this.map.scale);
+
+                console.log(`[DEBUG] Enemigo ${id}: Server(${x},${y}) -> World(${worldX},${worldY})`);
+
                 enemy.sprite.x = worldX;
                 enemy.sprite.y = worldY;
 
@@ -89,19 +92,41 @@ export default class EnemyManager {
 
     addEnemy(enemigo) {
         const path = this.map.createPath(); // Usar createPath() de Map
+        console.log('[DEBUG] Camino generado en cliente:', path);
+        console.log('[DEBUG] Enemigo recibido del servidor:', enemigo);
+
         const enemy = new Enemy(this.scene, path, enemigo.id, enemigo.type);
+
         // Guardar información de oleada si existe
         if (enemigo.oleada) {
             enemy.oleada = enemigo.oleada;
         }
-        // Si el servidor proporciona una posición inicial, usarla
-        if (enemigo.x && enemigo.y) {
-            enemy.sprite.x = enemigo.x;
-            enemy.sprite.y = enemigo.y;
+
+        // Si el servidor proporciona una posición inicial, convertirla a coordenadas de mundo
+        if (enemigo.x !== undefined && enemigo.y !== undefined) {
+            const worldX = this.map.offsetX + (enemigo.x * this.map.scale);
+            const worldY = this.map.offsetY + (enemigo.y * this.map.scale);
+
+            console.log(`[DEBUG] Posición inicial: Server(${enemigo.x},${enemigo.y}) -> World(${worldX},${worldY})`);
+
+            enemy.sprite.x = worldX;
+            enemy.sprite.y = worldY;
+
+            // También actualizar las barras de vida
+            if (enemy.healthBar) {
+                enemy.healthBar.x = worldX;
+                enemy.healthBar.y = worldY - this.scene.map.tileSize / 2 - 5;
+            }
+            if (enemy.healthBarBackground) {
+                enemy.healthBarBackground.x = worldX;
+                enemy.healthBarBackground.y = worldY - this.scene.map.tileSize / 2 - 5;
+            }
         }
+
         if (enemigo.currentPoint) {
             enemy.currentPoint = enemigo.currentPoint;
         }
+
         this.enemies.push(enemy);
     }
 

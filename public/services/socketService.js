@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 
 // Conectar al servidor de WebSockets - volver a localhost
-const socket = io('http://localhost:4000', {
+const socket = io('http://localhost:8080', {
     withCredentials: true,
     transports: ['websocket', 'polling']
 });
@@ -129,7 +129,10 @@ export function onTemporizadorOleada(callback) {
 // Nuevo evento para sincronizar posiciones de enemigos
 export function onEnemyPositionUpdated(callback) {
     socket.off('update-enemy-position'); // Evitar duplicados
-    socket.on('update-enemy-position', callback);
+    socket.on('update-enemy-position', (data) => {
+        console.log('[DEBUG] Actualización posición enemigo recibida:', data);
+        callback(data);
+    });
 }
 
 // Nuevo evento para cuando un enemigo llega a la base

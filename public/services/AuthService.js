@@ -2,9 +2,7 @@ import { io } from 'socket.io-client';
 
 class AuthService {
     constructor() {
-        this.baseUrl = process.env.NODE_ENV === 'production'
-            ? '/auth'
-            : 'http://localhost:4000/auth';
+        this.baseUrl = '/auth';
     }
 
     async register(email, password, username) {
