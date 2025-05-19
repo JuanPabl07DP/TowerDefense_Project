@@ -114,64 +114,87 @@ export default class Enemy {
 
     // Método de actualización mejorado
     update(time, delta) {
-
-        const now = Date.now();
-        const timeSinceUpdate = now - this.lastServerUpdate;
-
-        // Si hace poco recibimos una actualización del servidor, esperar un poco
-        if (timeSinceUpdate < this.serverSyncThreshold || this.movementPaused) {
-            return false;
+        // 1. Verificar si el enemigo está pausado o no existe
+        if (this.movementPaused || !this.sprite?.active) {
+            return;
         }
 
-        // Si ha pasado suficiente tiempo sin actualizaciones del servidor, usar movimiento local
-        if (this.currentPoint < this.path.length - 1) {
-            // Obtener siguiente punto en el camino
-            const nextPoint = this.path[this.currentPoint + 1];
+        // 2. Debug: Verificar estado actual
+        console.log(`[Enemy ${this.id}] Update - Posición: (${this.sprite.x.toFixed(1)},${this.sprite.y.toFixed(1)})`,
+            `Punto ${this.currentPoint}/${this.path.length-1}`,
+            `Velocidad: ${this.config.speed}`);
 
-            // Calcular dirección y distancia
-            const dx = nextPoint.x - this.sprite.x;
-            const dy = nextPoint.y - this.sprite.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+        // 3. Verificar si llegó a la base (último punto del camino)
+        if (this.currentPoint >= this.path.length - 1) {
+            if (!this._baseReached) { // Bandera para evitar ejecución múltiple
+                this._baseReached = true;
+                console.log(`[Enemy ${this.id}] ¡Llegó a la base!`);
 
-            // Usar velocidad normal según el tipo de enemigo
-            const speed = this.config.speed * delta / 16; // Normalizar para 60fps
+                // A. Aplicar daño localmente
+                if (typeof this.scene.damageCastle === 'function') {
+                    console.log(`[Enemy ${this.id}] Aplicando daño: ${this.damage}`);
+                    this.scene.damageCastle(this.damage);
 
-            // Si estamos cerca del punto, ir directamente al siguiente
-            if (distance <= speed) {
-                this.sprite.x = nextPoint.x;
-                this.sprite.y = nextPoint.y;
-                this.currentPoint++;
-
-                // Actualizar barras de vida
-                this.updateHealthBarPosition();
-
-                // Si llegamos al último punto, notificar que hemos llegado a la base
-                if (this.currentPoint >= this.path.length - 1) {
-                    // Si tienes acceso directo al socket, notificar al servidor
-                    if (window.socket) {
-                        window.socket.emit('enemigo-reached-base', {
-                            enemyId: this.id,
-                            damage: this.damage
-                        });
-                    }
-
-                    // Ya no actualizar más este enemigo
-                    this.movementPaused = true;
+                    // Mostrar texto de daño
+                    const basePos = this.scene.map.getTilePosition(15, 23);
+                    this.scene.enemyManager.showDamageText(
+                        basePos.x,
+                        basePos.y,
+                        this.damage
+                    );
+                } else {
+                    console.error('[Enemy] Error: scene.damageCastle no es función');
                 }
 
-                return true;
-            } else {
-                // Moverse hacia el siguiente punto
-                this.sprite.x += (dx / distance) * speed;
-                this.sprite.y += (dy / distance) * speed;
+                // B. Eliminación local
+                console.log(`[Enemy ${this.id}] Eliminando localmente`);
+                this.scene.enemyManager.removeEnemy(this.id);
 
-                // Actualizar barras de vida
-                this.updateHealthBarPosition();
-                return true;
+                // C. Intentar notificar al servidor (opcional)
+                if (window.socket?.connected) {
+                    console.log(`[Enemy ${this.id}] Notificando al servidor`);
+                    window.socket.emit('enemigo-reached-base', {
+                        enemyId: this.id,
+                        damage: this.damage
+                    });
+                } else {
+                    console.warn('[Enemy] Socket no disponible para notificar servidor');
+                }
+
+                // D. Destruir objetos
+                this.destroy();
             }
+            return;
         }
 
-        return false;
+        // 4. Movimiento normal hacia el siguiente punto
+        const nextPoint = this.path[this.currentPoint + 1];
+        const dx = nextPoint.x - this.sprite.x;
+        const dy = nextPoint.y - this.sprite.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // 5. Calcular velocidad (ajustada por delta time para consistencia en todos los FPS)
+        const speed = this.config.speed * (delta / 16); // Normalizado a 60 FPS
+
+        if (distance <= speed) {
+            // Llegó al siguiente punto
+            this.sprite.x = nextPoint.x;
+            this.sprite.y = nextPoint.y;
+            this.currentPoint++;
+
+            // Actualizar barras de vida
+            this.updateHealthBarPosition();
+
+            // Debug: Movimiento entre puntos
+            console.log(`[Enemy ${this.id}] Avanzó al punto ${this.currentPoint}`);
+        } else {
+            // Mover hacia el punto
+            this.sprite.x += (dx / distance) * speed;
+            this.sprite.y += (dy / distance) * speed;
+
+            // Actualizar barras de vida
+            this.updateHealthBarPosition();
+        }
     }
 
     // Método para eliminar al monstruo con limpieza
