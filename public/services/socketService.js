@@ -6,6 +6,8 @@ const socket = io('http://localhost:8080', {
     transports: ['websocket', 'polling']
 });
 
+window.socket = socket;
+
 // Eventos de conexión y diagnóstico
 socket.on('connect', () => {
     console.log('Conectado al servidor con ID:', socket.id);
@@ -138,7 +140,10 @@ export function onEnemyPositionUpdated(callback) {
 // Nuevo evento para cuando un enemigo llega a la base
 export function onEnemyReachedBase(callback) {
     socket.off('enemigo-reached-base'); // Evitar duplicados
-    socket.on('enemigo-reached-base', callback);
+    socket.on('enemigo-reached-base', (data) => {
+        console.log('[DEBUG] Enemigo llegó a la base:', data);
+        callback(data);
+    });
 }
 
 // Función para gastar monedas

@@ -6,16 +6,16 @@ export default class Map {
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4],
-            [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+            [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
             [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
             [1, 1, 1, 1, 1, 1, 1, 1, 0, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 1],
             [1, 1, 1, 1, 1, 1, 1, 4, 0, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 4, 4, 1, 1],
             [1, 1, 1, 1, 1, 1, 4, 4, 0, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -163,23 +163,46 @@ export default class Map {
     }
 
     // Método para generar la ruta de los enemigos
+// Método para generar la ruta de los enemigos
     createPath() {
-        // Debería generar exactamente los mismos puntos que en el servidor
-        // para que los enemigos se muevan correctamente por el camino
+        // Vamos a crear un camino que siga exactamente los ceros en la matriz del mapa
         const path = [];
+
+        // Coordenadas explícitas que siguen el camino de ceros en la matriz
         const pathCoords = [
-            { row: 0, col: 12 },   // Entrada
+            { row: 0, col: 12 },
+            { row: 1, col: 12 },
             { row: 2, col: 12 },
+            { row: 2, col: 11 },
             { row: 2, col: 10 },
-            { row: 4, col: 10 },
+            { row: 2, col: 9 },
+            { row: 3, col: 9 },
+            { row: 4, col: 9 },
             { row: 4, col: 8 },
+            { row: 5, col: 8 },
+            { row: 6, col: 8 },
+            { row: 7, col: 8 },
             { row: 8, col: 8 },
+            { row: 8, col: 8 },
+            { row: 8, col: 9 },
+            { row: 8, col: 10 },
+            { row: 8, col: 11 },
+            { row: 8, col: 12 },
             { row: 8, col: 16 },
+            { row: 9, col: 16 },
+            { row: 10, col: 16 },
             { row: 11, col: 16 },
+            { row: 11, col: 17 },
+            { row: 11, col: 18 },
+            { row: 11, col: 19 },
             { row: 11, col: 20 },
-            { row: 13, col: 20 },
+            { row: 11, col: 21 },
+            { row: 12, col: 21 },
+            { row: 12, col: 22 },
+            { row: 13, col: 22 },
             { row: 13, col: 23 },
-            { row: 15, col: 23 }   // Base
+            { row: 14, col: 23 },
+            { row: 15, col: 23 }
         ];
 
         // Convertir a coordenadas de pantalla usando el método de obtener posición
@@ -187,6 +210,9 @@ export default class Map {
             const position = this.getTilePosition(coord.row, coord.col);
             path.push({ x: position.x, y: position.y });
         }
+
+        // DEBUG: Validar que estamos siguiendo el camino de ceros
+        console.log("Generando camino basado en las coordenadas:", pathCoords);
 
         return path;
     }

@@ -28,6 +28,11 @@ export default class Enemy {
             this.scene.map.tileSize * this.config.scale
         );
 
+        // Para seguimiento del tiempo desde la última actualización
+        this.lastServerUpdate = Date.now();
+        this.serverSyncThreshold = 2000; // 2 segundos para intentar sincronizar con servidor
+        this.movementPaused = false;
+
         // Barra de vida (fondo)
         this.healthBarBackground = this.scene.add.rectangle(
             this.sprite.x,
@@ -71,26 +76,105 @@ export default class Enemy {
         return false;
     }
 
-    // Este método actualiza la posición según los datos del servidor
-    updatePosition(x, y, currentPoint) {
-        this.sprite.x = x;
-        this.sprite.y = y;
+    // Método para actualizar desde el servidor (mejorado)
+    updateFromServer(worldX, worldY, currentPoint) {
+        // Solo actualizar si la diferencia de posición es significativa o el punto es distinto
+        const distance = Math.sqrt(
+            Math.pow(this.sprite.x - worldX, 2) +
+            Math.pow(this.sprite.y - worldY, 2)
+        );
 
-        // Actualizar posición de las barras de vida
-        this.healthBarBackground.x = x;
-        this.healthBarBackground.y = y - this.scene.map.tileSize / 2 - 5;
-        this.healthBar.x = x;
-        this.healthBar.y = y - this.scene.map.tileSize / 2 - 5;
+        // Si la diferencia es grande o el punto ha cambiado, actualizar
+        if (distance > 20 || this.currentPoint !== currentPoint) {
 
-        this.currentPoint = currentPoint;
+            this.sprite.x = worldX;
+            this.sprite.y = worldY;
+            this.currentPoint = currentPoint;
+
+            // Actualizar barras de vida
+            this.updateHealthBarPosition();
+        }
+
+        // Marcar el tiempo de la última actualización
+        this.lastServerUpdate = Date.now();
+        this.movementPaused = false;
     }
 
-    // Método para actualizar el enemigo (ya no mueve el enemigo)
-    update() {
-        // No actualizamos el movimiento aquí, ahora viene del servidor
+    // Método para actualizar posición de barras de vida
+    updateHealthBarPosition() {
+        if (this.healthBar) {
+            this.healthBar.x = this.sprite.x;
+            this.healthBar.y = this.sprite.y - this.scene.map.tileSize / 2 - 5;
+        }
+        if (this.healthBarBackground) {
+            this.healthBarBackground.x = this.sprite.x;
+            this.healthBarBackground.y = this.sprite.y - this.scene.map.tileSize / 2 - 5;
+        }
     }
 
-    // Método para eliminar al monstruo
+    // Método de actualización mejorado
+    update(time, delta) {
+
+        const now = Date.now();
+        const timeSinceUpdate = now - this.lastServerUpdate;
+
+        // Si hace poco recibimos una actualización del servidor, esperar un poco
+        if (timeSinceUpdate < this.serverSyncThreshold || this.movementPaused) {
+            return false;
+        }
+
+        // Si ha pasado suficiente tiempo sin actualizaciones del servidor, usar movimiento local
+        if (this.currentPoint < this.path.length - 1) {
+            // Obtener siguiente punto en el camino
+            const nextPoint = this.path[this.currentPoint + 1];
+
+            // Calcular dirección y distancia
+            const dx = nextPoint.x - this.sprite.x;
+            const dy = nextPoint.y - this.sprite.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Usar velocidad normal según el tipo de enemigo
+            const speed = this.config.speed * delta / 16; // Normalizar para 60fps
+
+            // Si estamos cerca del punto, ir directamente al siguiente
+            if (distance <= speed) {
+                this.sprite.x = nextPoint.x;
+                this.sprite.y = nextPoint.y;
+                this.currentPoint++;
+
+                // Actualizar barras de vida
+                this.updateHealthBarPosition();
+
+                // Si llegamos al último punto, notificar que hemos llegado a la base
+                if (this.currentPoint >= this.path.length - 1) {
+                    // Si tienes acceso directo al socket, notificar al servidor
+                    if (window.socket) {
+                        window.socket.emit('enemigo-reached-base', {
+                            enemyId: this.id,
+                            damage: this.damage
+                        });
+                    }
+
+                    // Ya no actualizar más este enemigo
+                    this.movementPaused = true;
+                }
+
+                return true;
+            } else {
+                // Moverse hacia el siguiente punto
+                this.sprite.x += (dx / distance) * speed;
+                this.sprite.y += (dy / distance) * speed;
+
+                // Actualizar barras de vida
+                this.updateHealthBarPosition();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Método para eliminar al monstruo con limpieza
     destroy() {
         this.healthBar.destroy();
         this.healthBarBackground.destroy();

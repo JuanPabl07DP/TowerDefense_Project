@@ -13,34 +13,22 @@ export default class EnemyManager {
         this.scene.events.on('nueva-oleada', (oleada) => {
             this.oleadaActual = oleada;
             this.oleadaEnCurso = true;
-            console.log(`Oleada ${oleada} iniciada`);
         });
 
-        // Escuchar actualizaciones de posición desde el servidor
+        // Escuchar actualizaciones de posición desde el servidor (mejorado)
         onEnemyPositionUpdated((data) => {
             const { id, x, y, currentPoint } = data;
             const enemy = this.enemies.find(e => e.id === id);
+
             if (enemy) {
-                // IMPORTANTE: Convertir coordenadas del servidor a coordenadas del mundo
+                // Transformar coordenadas
                 const worldX = this.map.offsetX + (x * this.map.scale);
                 const worldY = this.map.offsetY + (y * this.map.scale);
 
-                console.log(`[DEBUG] Enemigo ${id}: Server(${x},${y}) -> World(${worldX},${worldY})`);
-
-                enemy.sprite.x = worldX;
-                enemy.sprite.y = worldY;
-
-                // Actualizar barras de vida
-                if (enemy.healthBar) {
-                    enemy.healthBar.x = worldX;
-                    enemy.healthBar.y = worldY - this.scene.map.tileSize / 2 - 5;
-                }
-                if (enemy.healthBarBackground) {
-                    enemy.healthBarBackground.x = worldX;
-                    enemy.healthBarBackground.y = worldY - this.scene.map.tileSize / 2 - 5;
-                }
-
-                enemy.currentPoint = currentPoint;
+                // Usar método mejorado para actualizar desde servidor
+                enemy.updateFromServer(worldX, worldY, currentPoint);
+            } else {
+                console.warn(`Enemigo ${id} no encontrado para actualización`);
             }
         });
 
@@ -92,9 +80,6 @@ export default class EnemyManager {
 
     addEnemy(enemigo) {
         const path = this.map.createPath(); // Usar createPath() de Map
-        console.log('[DEBUG] Camino generado en cliente:', path);
-        console.log('[DEBUG] Enemigo recibido del servidor:', enemigo);
-
         const enemy = new Enemy(this.scene, path, enemigo.id, enemigo.type);
 
         // Guardar información de oleada si existe
@@ -102,30 +87,37 @@ export default class EnemyManager {
             enemy.oleada = enemigo.oleada;
         }
 
-        // Si el servidor proporciona una posición inicial, convertirla a coordenadas de mundo
-        if (enemigo.x !== undefined && enemigo.y !== undefined) {
+        // Posicionar al inicio del camino si es el primer punto
+        if (!enemigo.currentPoint || enemigo.currentPoint === 0) {
+            const startPoint = path[0];
+            enemy.sprite.x = startPoint.x;
+            enemy.sprite.y = startPoint.y;
+            enemy.currentPoint = 0;
+        }
+        // Si tiene posición definida, usarla
+        else if (enemigo.x !== undefined && enemigo.y !== undefined) {
             const worldX = this.map.offsetX + (enemigo.x * this.map.scale);
             const worldY = this.map.offsetY + (enemigo.y * this.map.scale);
-
-            console.log(`[DEBUG] Posición inicial: Server(${enemigo.x},${enemigo.y}) -> World(${worldX},${worldY})`);
-
             enemy.sprite.x = worldX;
             enemy.sprite.y = worldY;
 
-            // También actualizar las barras de vida
-            if (enemy.healthBar) {
-                enemy.healthBar.x = worldX;
-                enemy.healthBar.y = worldY - this.scene.map.tileSize / 2 - 5;
+            if (enemigo.currentPoint) {
+                enemy.currentPoint = enemigo.currentPoint;
             }
-            if (enemy.healthBarBackground) {
-                enemy.healthBarBackground.x = worldX;
-                enemy.healthBarBackground.y = worldY - this.scene.map.tileSize / 2 - 5;
-            }
+        }
+        // Fallback por si no hay información
+        else {
+            const startPoint = path[0];
+            enemy.sprite.x = startPoint.x;
+            enemy.sprite.y = startPoint.y;
+            enemy.currentPoint = 0;
         }
 
-        if (enemigo.currentPoint) {
-            enemy.currentPoint = enemigo.currentPoint;
-        }
+        // Actualizar barras de vida
+        enemy.updateHealthBarPosition();
+
+        // Inicializar tiempo de última actualización
+        enemy.lastServerUpdate = Date.now();
 
         this.enemies.push(enemy);
     }
@@ -139,7 +131,7 @@ export default class EnemyManager {
             // Emitir evento de oleada completada
             this.scene.events.emit('oleada-completada', this.oleadaActual);
 
-            // Solo mostrar victoria si era la última oleada (4) y no hay enemigos activos
+            // Solo mostrar victoria si era la última oleada (6) y no hay enemigos activos
             if (this.oleadaActual >= 6 && enemigosActivos.length === 0) {
                 this.scene.time.delayedCall(1500, () => {
                     if (this.scene.gameOver) {
@@ -158,9 +150,14 @@ export default class EnemyManager {
         }
     }
 
-    // El método update ahora solo verifica enemigos eliminados
-    update() {
-        // Ya no actualizamos el movimiento aquí
+    // Método update mejorado para pasar time y delta a los enemigos
+    update(time, delta) {
+        // Actualizar cada enemigo para movimiento
+        for (const enemy of this.enemies) {
+            enemy.update(time, delta);
+        }
+
+        // Filtrar enemigos eliminados
         this.enemies = this.enemies.filter(e => e.sprite.active);
         this.verificarFinOleada();
     }

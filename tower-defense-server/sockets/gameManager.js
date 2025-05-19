@@ -50,20 +50,47 @@ function initializeGameManager(io, roomManager, redisClient) {
         };
     }
 
-    /**
-     * Genera el camino que seguirán los enemigos
-     * @returns {Array} Array de puntos {x,y} que forman el camino
-     */
     function generatePath() {
         const tileSize = 60;
+        // Coordenadas explícitas que siguen el camino de ceros en la matriz
         const pathCoords = [
-            { row: 0, col: 12 }, { row: 2, col: 12 },
-            { row: 2, col: 10 }, { row: 4, col: 8 },
-            { row: 8, col: 8 }, { row: 8, col: 16 },
-            { row: 11, col: 16 }, { row: 11, col: 20 },
-            { row: 13, col: 23 }, { row: 15, col: 23 }
+            { row: 0, col: 12 },
+            { row: 1, col: 12 },
+            { row: 2, col: 12 },
+            { row: 2, col: 11 },
+            { row: 2, col: 10 },
+            { row: 2, col: 9 },
+            { row: 3, col: 9 },
+            { row: 4, col: 9 },
+            { row: 4, col: 8 },
+            { row: 5, col: 8 },
+            { row: 6, col: 8 },
+            { row: 7, col: 8 },
+            { row: 8, col: 8 },
+            { row: 8, col: 8 },
+            { row: 8, col: 9 },
+            { row: 8, col: 10 },
+            { row: 8, col: 11 },
+            { row: 8, col: 12 },
+            { row: 8, col: 16 },
+            { row: 9, col: 16 },
+            { row: 10, col: 16 },
+            { row: 11, col: 16 },
+            { row: 11, col: 17 },
+            { row: 11, col: 18 },
+            { row: 11, col: 19 },
+            { row: 11, col: 20 },
+            { row: 11, col: 21 },
+            { row: 12, col: 21 },
+            { row: 12, col: 22 },
+            { row: 13, col: 22 },
+            { row: 13, col: 23 },
+            { row: 14, col: 23 },
+            { row: 15, col: 23 }
         ];
 
+
+        // Convertir a coordenadas en píxeles
         return pathCoords.map(point => ({
             x: point.col * tileSize + (tileSize / 2),
             y: point.row * tileSize + (tileSize / 2)

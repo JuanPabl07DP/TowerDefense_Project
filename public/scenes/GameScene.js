@@ -951,11 +951,9 @@ export default class GameScene extends Phaser.Scene {
         this.scene.start('MenuScene');
     }
 
-    update() {
-        // Actualizar la posición de los monstruos
-        this.enemyManager.update();
+    update(time, delta) {
+        this.enemyManager.update(time, delta);
 
-        // Actualizar los proyectiles
         this.tower.update();
     }
 }
