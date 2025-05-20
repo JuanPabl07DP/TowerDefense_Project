@@ -1,6 +1,7 @@
 const { createClient } = require('redis');
 const { Pool } = require('pg');
 require('dotenv').config();
+const fs = require('fs');
 
 // Configuración de Redis
 let redisClient;
@@ -12,6 +13,10 @@ const pgPool = new Pool({
     database: process.env.POSTGRES_DB,
     password: process.env.POSTGRES_PASSWORD,
     port: process.env.POSTGRES_PORT,
+    ssl: {
+        rejectUnauthorized: true, // Obligatorio para RDS
+        ca: fs.readFileSync('rds-ca-2019-root.pem').toString(), // Certificado AWS
+    },
 });
 
 // Inicializar el cliente Redis para audit trail
