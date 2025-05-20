@@ -1,3 +1,5 @@
+const { logEvent } = require('../services/auditTrail');
+
 function handleSocketEvents(io, roomManager, gameManager) {
     io.on('connection', (socket) => {
         console.log('Nuevo cliente conectado:', socket.id);
@@ -5,6 +7,22 @@ function handleSocketEvents(io, roomManager, gameManager) {
         // Obtener puerto o dirección para identificar el servidor
         const SERVER_PORT = process.argv[2] || process.env.PORT || 4000;
         const SERVER_ID = `Server-${SERVER_PORT}`;
+
+        // Obtener información del cliente
+        const clientIP = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
+        const userId = socket.handshake.auth.userId || socket.id;
+
+        // Registrar conexión en el audit trail
+        logEvent({
+            userId,
+            ip: clientIP,
+            operation: 'socket:connect',
+            details: {
+                socketId: socket.id,
+                userAgent: socket.handshake.headers['user-agent'],
+                transport: socket.conn.transport?.name || 'unknown'
+            }
+        });
 
         // Enviar información del servidor al cliente
         socket.emit('server-info', {
@@ -32,6 +50,18 @@ function handleSocketEvents(io, roomManager, gameManager) {
                     await roomManager.saveGameState(roomCode, gameState);
                 }
 
+                // Registrar creación de sala en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'room:create',
+                    details: {
+                        roomCode,
+                        socketId: socket.id,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+
                 socket.emit('roomCreated', {
                     roomCode,
                     playerId: socket.id,
@@ -44,6 +74,19 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 console.error('[ERROR] Error detallado al crear sala:', error);
                 // Analizar el error más profundamente
                 console.error('[ERROR] Stack:', error.stack);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'room:create',
+                    status: 'error',
+                    details: {
+                        error: error.message,
+                        stack: error.stack
+                    }
+                });
+
                 socket.emit('error', { message: 'Error al crear sala: ' + error.message });
             }
         });
@@ -63,6 +106,18 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 // Obtener estado del juego
                 const gameState = await roomManager.getGameState(roomCode);
 
+                // Registrar unión a sala en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'room:join',
+                    details: {
+                        roomCode,
+                        socketId: socket.id,
+                        playerCount: roomData.players.length
+                    }
+                });
+
                 // Notificar a todos en la sala
                 io.to(roomCode).emit('playerJoined', {
                     roomCode,
@@ -78,11 +133,33 @@ function handleSocketEvents(io, roomManager, gameManager) {
                     // Actualizar estado de la sala
                     await roomManager.updateRoomStatus(roomCode, 'playing');
 
+                    // Registrar sala lista para jugar
+                    logEvent({
+                        userId,
+                        ip: clientIP,
+                        operation: 'room:ready',
+                        details: {
+                            roomCode,
+                            players: roomData.players.length
+                        }
+                    });
+
                     setTimeout(async () => {
                         // Notificar inicio de juego
                         io.to(roomCode).emit('gameStarted', {
                             roomCode,
                             serverId: SERVER_ID
+                        });
+
+                        // Registrar inicio de juego
+                        logEvent({
+                            userId: 'system',
+                            ip: '127.0.0.1',
+                            operation: 'game:start',
+                            details: {
+                                roomCode,
+                                players: roomData.players.length
+                            }
                         });
 
                         // Obtener estado actualizado
@@ -98,6 +175,19 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 }
             } catch (error) {
                 console.error('Error al unirse a sala:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'room:join',
+                    status: 'error',
+                    details: {
+                        roomCode,
+                        error: error.message
+                    }
+                });
+
                 socket.emit('joinError', {
                     message: error.message,
                     serverId: SERVER_ID
@@ -109,11 +199,33 @@ function handleSocketEvents(io, roomManager, gameManager) {
             try {
                 if (!roomCode) return;
 
+                // Registrar salida de sala en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'room:leave',
+                    details: {
+                        roomCode,
+                        socketId: socket.id
+                    }
+                });
+
                 // Eliminar jugador de la sala
                 const roomDeleted = await roomManager.leaveRoom(socket, roomCode);
 
                 if (roomDeleted) {
                     console.log(`Sala eliminada: ${roomCode}`);
+
+                    // Registrar eliminación de sala
+                    logEvent({
+                        userId: 'system',
+                        ip: '127.0.0.1',
+                        operation: 'room:delete',
+                        details: {
+                            roomCode,
+                            reason: 'all_players_left'
+                        }
+                    });
                 } else {
                     // Obtener jugadores actualizados
                     const players = await roomManager.getPlayersInRoom(roomCode);
@@ -131,6 +243,18 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 socket.roomCode = null;
             } catch (error) {
                 console.error('Error al abandonar sala:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'room:leave',
+                    status: 'error',
+                    details: {
+                        roomCode,
+                        error: error.message
+                    }
+                });
             }
         });
 
@@ -148,6 +272,18 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 const { x, y, tipo } = data;
                 const validTypes = ['basic', 'sniper', 'rapid'];
                 const towerType = validTypes.includes(tipo) ? tipo : 'basic';
+
+                // Registrar colocación de torre en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:place-tower',
+                    details: {
+                        roomCode,
+                        towerType,
+                        position: { x, y }
+                    }
+                });
 
                 // Obtener estado del juego
                 const gameState = await roomManager.getGameState(roomCode);
@@ -170,6 +306,19 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 console.log(`Torre ${towerType} colocada en (${x},${y}) - Sala ${roomCode}`);
             } catch (error) {
                 console.error('Error al colocar torre:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:place-tower',
+                    status: 'error',
+                    details: {
+                        roomCode: socket.roomCode,
+                        error: error.message,
+                        towerData: data
+                    }
+                });
             }
         });
 
@@ -181,6 +330,20 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 const exists = await roomManager.roomExists(roomCode);
                 if (!exists) return;
 
+                // Registrar disparo de proyectil en audit trail (opcional, genera muchos eventos)
+                /*
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:fire-projectile',
+                    details: {
+                        roomCode,
+                        targetId: data.targetId,
+                        position: { x: data.x, y: data.y }
+                    }
+                });
+                */
+
                 // Añadir información del servidor al evento
                 data.serverId = SERVER_ID;
 
@@ -188,6 +351,18 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 io.to(roomCode).emit('proyectil-disparado', data);
             } catch (error) {
                 console.error('Error al disparar proyectil:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:fire-projectile',
+                    status: 'error',
+                    details: {
+                        roomCode: socket.roomCode,
+                        error: error.message
+                    }
+                });
             }
         });
 
@@ -198,6 +373,17 @@ function handleSocketEvents(io, roomManager, gameManager) {
 
                 const exists = await roomManager.roomExists(roomCode);
                 if (!exists) return;
+
+                // Registrar eliminación de enemigo en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:kill-enemy',
+                    details: {
+                        roomCode,
+                        enemyId: enemigoId
+                    }
+                });
 
                 // Obtener estado del juego
                 const gameState = await roomManager.getGameState(roomCode);
@@ -215,6 +401,19 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 console.log(`Enemigo ${enemigoId} eliminado en sala ${roomCode}`);
             } catch (error) {
                 console.error('Error al eliminar enemigo:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:kill-enemy',
+                    status: 'error',
+                    details: {
+                        roomCode: socket.roomCode,
+                        enemyId: enemigoId,
+                        error: error.message
+                    }
+                });
             }
         });
 
@@ -225,6 +424,17 @@ function handleSocketEvents(io, roomManager, gameManager) {
 
                 const exists = await roomManager.roomExists(roomCode);
                 if (!exists) return;
+
+                // Registrar gasto de monedas en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:spend-currency',
+                    details: {
+                        roomCode,
+                        amount: cantidad
+                    }
+                });
 
                 // Obtener estado del juego
                 const gameState = await roomManager.getGameState(roomCode);
@@ -242,9 +452,36 @@ function handleSocketEvents(io, roomManager, gameManager) {
                     io.to(roomCode).emit('actualizar-monedas', gameState.monedas);
 
                     console.log(`Monedas gastadas: ${cantidad} - Sala ${roomCode}`);
+                } else {
+                    // Registrar intento fallido
+                    logEvent({
+                        userId,
+                        ip: clientIP,
+                        operation: 'game:spend-currency',
+                        status: 'error',
+                        details: {
+                            roomCode,
+                            amount: cantidad,
+                            available: gameState.monedas,
+                            reason: 'insufficient_funds'
+                        }
+                    });
                 }
             } catch (error) {
                 console.error('Error al gastar monedas:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:spend-currency',
+                    status: 'error',
+                    details: {
+                        roomCode: socket.roomCode,
+                        amount: cantidad,
+                        error: error.message
+                    }
+                });
             }
         });
 
@@ -255,6 +492,17 @@ function handleSocketEvents(io, roomManager, gameManager) {
 
                 const exists = await roomManager.roomExists(roomCode);
                 if (!exists) return;
+
+                // Registrar adición de monedas en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:add-currency',
+                    details: {
+                        roomCode,
+                        amount: cantidad
+                    }
+                });
 
                 // Obtener estado del juego
                 const gameState = await roomManager.getGameState(roomCode);
@@ -272,11 +520,35 @@ function handleSocketEvents(io, roomManager, gameManager) {
                 console.log(`Monedas añadidas: ${cantidad} - Sala ${roomCode}`);
             } catch (error) {
                 console.error('Error al agregar monedas:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'game:add-currency',
+                    status: 'error',
+                    details: {
+                        roomCode: socket.roomCode,
+                        amount: cantidad,
+                        error: error.message
+                    }
+                });
             }
         });
 
         // Nuevo evento para pruebas de balanceo
         socket.on('ping-server', () => {
+            // Registrar ping en audit trail
+            logEvent({
+                userId,
+                ip: clientIP,
+                operation: 'server:ping',
+                details: {
+                    socketId: socket.id,
+                    serverId: SERVER_ID
+                }
+            });
+
             socket.emit('pong-server', {
                 serverId: SERVER_ID,
                 port: SERVER_PORT,
@@ -287,6 +559,18 @@ function handleSocketEvents(io, roomManager, gameManager) {
         socket.on('disconnect', async () => {
             try {
                 console.log(`Cliente desconectado: ${socket.id}`);
+
+                // Registrar desconexión en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'socket:disconnect',
+                    details: {
+                        socketId: socket.id,
+                        roomCode: socket.roomCode,
+                        reason: socket.disconnectReason || 'unknown'
+                    }
+                });
 
                 const roomCode = socket.roomCode;
                 if (!roomCode) return;
@@ -308,9 +592,33 @@ function handleSocketEvents(io, roomManager, gameManager) {
                         serverId: SERVER_ID,
                         players
                     });
+                } else {
+                    // Registrar eliminación de sala tras desconexión
+                    logEvent({
+                        userId: 'system',
+                        ip: '127.0.0.1',
+                        operation: 'room:delete',
+                        details: {
+                            roomCode,
+                            reason: 'disconnect_last_player'
+                        }
+                    });
                 }
             } catch (error) {
                 console.error('Error al manejar desconexión:', error);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId,
+                    ip: clientIP,
+                    operation: 'socket:disconnect',
+                    status: 'error',
+                    details: {
+                        socketId: socket.id,
+                        roomCode: socket.roomCode,
+                        error: error.message
+                    }
+                });
             }
         });
     });

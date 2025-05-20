@@ -1,3 +1,5 @@
+const { logEvent } = require('../services/auditTrail');
+
 function initializeGameManager(io, roomManager, redisClient) {
     // Configuración de oleadas (compartida por todas las salas)
     const oleadasConfig = [
@@ -16,9 +18,32 @@ function initializeGameManager(io, roomManager, redisClient) {
             await redisClient.set('game:oleadas_config', JSON.stringify(oleadasConfig));
             console.log('Configuración de oleadas guardada en Redis');
 
+            // Registrar inicialización en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:initialize',
+                details: {
+                    oleadasCount: oleadasConfig.length,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
             // También podríamos guardar otras configuraciones globales aquí
         } catch (error) {
             console.error('Error al inicializar datos de juego en Redis:', error);
+
+            // Registrar error en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:initialize',
+                status: 'error',
+                details: {
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
     }
 
@@ -33,7 +58,7 @@ function initializeGameManager(io, roomManager, redisClient) {
      * @returns {Object} Estado inicial del juego
      */
     function initializeGameState() {
-        return {
+        const initialState = {
             torres: [],
             enemigos: [],
             monedas: 100,
@@ -48,6 +73,19 @@ function initializeGameManager(io, roomManager, redisClient) {
                 total: 0
             }
         };
+
+        // Registrar inicialización de estado del juego (sin roomCode aquí)
+        logEvent({
+            userId: 'system',
+            ip: '127.0.0.1',
+            operation: 'game:state_initialize',
+            details: {
+                initialMonedas: initialState.monedas,
+                timestamp: new Date().toISOString()
+            }
+        });
+
+        return initialState;
     }
 
     function generatePath() {
@@ -109,12 +147,43 @@ function initializeGameManager(io, roomManager, redisClient) {
             const roomExists = await roomManager.roomExists(roomCode);
             if (!roomExists) {
                 console.error(`No se puede iniciar oleada: la sala ${roomCode} no existe`);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId: 'system',
+                    ip: '127.0.0.1',
+                    operation: 'game:wave_start',
+                    status: 'error',
+                    details: {
+                        roomCode,
+                        oleadaIndex,
+                        reason: 'room_not_exists',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+
                 return;
             }
 
             // Verificar límite de oleadas
             if (oleadaIndex >= oleadasConfig.length) {
                 console.log(`Oleada ${oleadaIndex} fuera de rango, no se inicia`);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId: 'system',
+                    ip: '127.0.0.1',
+                    operation: 'game:wave_start',
+                    status: 'error',
+                    details: {
+                        roomCode,
+                        oleadaIndex,
+                        reason: 'wave_out_of_range',
+                        maxOleadas: oleadasConfig.length,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+
                 return;
             }
 
@@ -125,6 +194,21 @@ function initializeGameManager(io, roomManager, redisClient) {
             let gameState = await roomManager.getGameState(roomCode);
             if (!gameState) {
                 console.error(`No se encontró estado de juego para sala ${roomCode}`);
+
+                // Registrar error en audit trail
+                logEvent({
+                    userId: 'system',
+                    ip: '127.0.0.1',
+                    operation: 'game:wave_start',
+                    status: 'error',
+                    details: {
+                        roomCode,
+                        oleadaIndex,
+                        reason: 'game_state_not_found',
+                        timestamp: new Date().toISOString()
+                    }
+                });
+
                 return;
             }
 
@@ -143,6 +227,21 @@ function initializeGameManager(io, roomManager, redisClient) {
 
             // Guardar estado actualizado
             await roomManager.saveGameState(roomCode, gameState);
+
+            // Registrar inicio de oleada en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:wave_start',
+                details: {
+                    roomCode,
+                    waveNumber: gameState.oleadaActual,
+                    enemiesCount: config.cantidad,
+                    delay: config.delay,
+                    waitTime: config.espera,
+                    timestamp: new Date().toISOString()
+                }
+            });
 
             // Notificar a los clientes
             io.to(roomCode).emit('nueva-oleada', gameState.oleadaActual);
@@ -182,6 +281,23 @@ function initializeGameManager(io, roomManager, redisClient) {
                         // Guardar estado actualizado
                         await roomManager.saveGameState(roomCode, gameState);
 
+                        // Registrar creación de enemigo en audit trail (opcional, puede generar muchos registros)
+                        /*
+                        logEvent({
+                            userId: 'system',
+                            ip: '127.0.0.1',
+                            operation: 'game:enemy_spawn',
+                            details: {
+                                roomCode,
+                                enemyId: nuevoEnemigo.id,
+                                enemyType: nuevoEnemigo.type,
+                                waveNumber: gameState.oleadaActual,
+                                remaining: gameState.enemigosRestantes,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                        */
+
                         // Notificar a los clientes
                         io.to(roomCode).emit('nuevo-enemigo', nuevoEnemigo);
                         io.to(roomCode).emit('enemigos-restantes', gameState.enemigosRestantes);
@@ -194,11 +310,38 @@ function initializeGameManager(io, roomManager, redisClient) {
                         gameState.enOleada = false;
                         await roomManager.saveGameState(roomCode, gameState);
 
+                        // Registrar finalización de generación de enemigos
+                        logEvent({
+                            userId: 'system',
+                            ip: '127.0.0.1',
+                            operation: 'game:enemies_generation_complete',
+                            details: {
+                                roomCode,
+                                waveNumber: gameState.oleadaActual,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+
                         // Iniciar temporizador para la siguiente oleada
                         iniciarTemporizadorSiguienteOleada(roomCode, oleadaIndex, config.espera);
                     }
                 } catch (error) {
                     console.error(`Error en intervalo de enemigos para sala ${roomCode}:`, error);
+
+                    // Registrar error en audit trail
+                    logEvent({
+                        userId: 'system',
+                        ip: '127.0.0.1',
+                        operation: 'game:enemy_generation',
+                        status: 'error',
+                        details: {
+                            roomCode,
+                            waveNumber: gameState?.oleadaActual,
+                            error: error.message,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+
                     clearInterval(intervaloEnemigos);
                     activeIntervals.delete(`enemies:${roomCode}`);
                 }
@@ -209,6 +352,20 @@ function initializeGameManager(io, roomManager, redisClient) {
 
         } catch (error) {
             console.error(`Error al iniciar oleada ${oleadaIndex} en sala ${roomCode}:`, error);
+
+            // Registrar error en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:wave_start',
+                status: 'error',
+                details: {
+                    roomCode,
+                    oleadaIndex,
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
     }
 
@@ -301,7 +458,7 @@ function initializeGameManager(io, roomManager, redisClient) {
             }
 
             // Crear y devolver el nuevo enemigo
-            return {
+            const nuevoEnemigo = {
                 id: Date.now() + Math.floor(Math.random() * 1000),
                 type: enemyType,
                 oleada: oleadaActual,
@@ -310,8 +467,25 @@ function initializeGameManager(io, roomManager, redisClient) {
                 x: generatePath()[0].x,
                 y: generatePath()[0].y
             };
+
+            return nuevoEnemigo;
         } catch (error) {
             console.error(`Error al crear enemigo en sala ${roomCode}:`, error);
+
+            // Registrar error en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:enemy_create',
+                status: 'error',
+                details: {
+                    roomCode,
+                    waveNumber: oleadaActual,
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
             return null;
         }
     }
@@ -334,6 +508,20 @@ function initializeGameManager(io, roomManager, redisClient) {
                 clearInterval(activeIntervals.get(`timer:${roomCode}`));
             }
 
+            // Registrar inicio del temporizador en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:wave_timer_start',
+                details: {
+                    roomCode,
+                    currentWave: oleadaIndex + 1,
+                    nextWave: oleadaIndex + 2,
+                    waitTimeSeconds: espera / 1000,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
             let segundosRestantes = espera / 1000;
             io.to(roomCode).emit('temporizador-oleada', segundosRestantes);
 
@@ -354,11 +542,40 @@ function initializeGameManager(io, roomManager, redisClient) {
                         clearInterval(intervalo);
                         activeIntervals.delete(`timer:${roomCode}`);
 
+                        // Registrar fin del temporizador en audit trail
+                        logEvent({
+                            userId: 'system',
+                            ip: '127.0.0.1',
+                            operation: 'game:wave_timer_end',
+                            details: {
+                                roomCode,
+                                currentWave: oleadaIndex + 1,
+                                nextWave: oleadaIndex + 2,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+
                         // Iniciar siguiente oleada
                         await iniciarOleada(roomCode, oleadaIndex + 1);
                     }
                 } catch (error) {
                     console.error(`Error en temporizador para sala ${roomCode}:`, error);
+
+                    // Registrar error en audit trail
+                    logEvent({
+                        userId: 'system',
+                        ip: '127.0.0.1',
+                        operation: 'game:wave_timer',
+                        status: 'error',
+                        details: {
+                            roomCode,
+                            currentWave: oleadaIndex + 1,
+                            secondsRemaining: segundosRestantes,
+                            error: error.message,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+
                     clearInterval(intervalo);
                     activeIntervals.delete(`timer:${roomCode}`);
                 }
@@ -369,6 +586,20 @@ function initializeGameManager(io, roomManager, redisClient) {
 
         } catch (error) {
             console.error(`Error al iniciar temporizador para sala ${roomCode}:`, error);
+
+            // Registrar error en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'game:wave_timer_start',
+                status: 'error',
+                details: {
+                    roomCode,
+                    currentWave: oleadaIndex + 1,
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                }
+            });
         }
     }
 
@@ -415,6 +646,20 @@ function initializeGameManager(io, roomManager, redisClient) {
                         if (enemigoActualizado.reachedBase) {
                             enemigosEliminados.push(enemigo.id);
 
+                            // Registrar enemigo llegó a la base en audit trail
+                            logEvent({
+                                userId: 'system',
+                                ip: '127.0.0.1',
+                                operation: 'game:enemy_reached_base',
+                                details: {
+                                    roomCode,
+                                    enemyId: enemigo.id,
+                                    enemyType: enemigo.type,
+                                    damage: enemigoActualizado.damage,
+                                    timestamp: new Date().toISOString()
+                                }
+                            });
+
                             // Enviar evento de enemigo llegado a la base
                             io.to(roomCode).emit('enemigo-reached-base', {
                                 enemyId: enemigo.id,
@@ -442,10 +687,37 @@ function initializeGameManager(io, roomManager, redisClient) {
 
                 } catch (error) {
                     console.error(`Error actualizando enemigos en sala ${roomCode}:`, error);
+
+                    // Registrar error en audit trail
+                    logEvent({
+                        userId: 'system',
+                        ip: '127.0.0.1',
+                        operation: 'game:enemy_positions_update',
+                        status: 'error',
+                        details: {
+                            roomCode,
+                            error: error.message,
+                            timestamp: new Date().toISOString()
+                        }
+                    });
                 }
             }
         } catch (error) {
             console.error('Error al actualizar posiciones de enemigos:', error);
+
+            // Registrar error en audit trail (menos frecuente para no saturar)
+            if (Math.random() < 0.01) { // Solo registrar 1% de estos errores para no saturar
+                logEvent({
+                    userId: 'system',
+                    ip: '127.0.0.1',
+                    operation: 'game:enemy_positions_global',
+                    status: 'error',
+                    details: {
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
         }
     }
 
@@ -493,6 +765,22 @@ function initializeGameManager(io, roomManager, redisClient) {
             enemigo.x = nextPoint.x;
             enemigo.y = nextPoint.y;
             enemigo.currentPoint++;
+
+            // Registrar llegada a punto clave (opcional, solo para puntos específicos para no saturar)
+            if (enemigo.currentPoint % 10 === 0) { // Solo registrar cada 10 puntos
+                logEvent({
+                    userId: 'system',
+                    ip: '127.0.0.1',
+                    operation: 'game:enemy_checkpoint',
+                    details: {
+                        roomCode,
+                        enemyId: enemigo.id,
+                        enemyType: enemigo.type,
+                        checkpoint: enemigo.currentPoint,
+                        timestamp: new Date().toISOString()
+                    }
+                });
+            }
         }
 
         return {
@@ -507,6 +795,18 @@ function initializeGameManager(io, roomManager, redisClient) {
             clearInterval(interval);
         }
         activeIntervals.clear();
+
+        // Registrar limpieza en audit trail
+        logEvent({
+            userId: 'system',
+            ip: '127.0.0.1',
+            operation: 'game:cleanup_intervals',
+            details: {
+                intervalsCount: activeIntervals.size,
+                reason: 'server_shutdown',
+                timestamp: new Date().toISOString()
+            }
+        });
     }
 
     // Registrar event listener para limpieza al cerrar
@@ -516,6 +816,18 @@ function initializeGameManager(io, roomManager, redisClient) {
     // Iniciar el bucle de actualización (30 fps)
     const updateInterval = setInterval(updateEnemyPositions, 1000 / 30);
     activeIntervals.set('global:updateEnemyPositions', updateInterval);
+
+    // Registrar inicio del bucle de actualización
+    logEvent({
+        userId: 'system',
+        ip: '127.0.0.1',
+        operation: 'game:start_update_loop',
+        details: {
+            fps: 30,
+            updateIntervalMs: 1000 / 30,
+            timestamp: new Date().toISOString()
+        }
+    });
 
     return {
         initializeGameState,
