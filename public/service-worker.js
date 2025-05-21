@@ -182,6 +182,19 @@ self.addEventListener('fetch', (event) => {
 
 // Evento para mensajes del cliente
 self.addEventListener('message', (event) => {
+    // Verificar que el mensaje proviene de un origen confiable
+    const trustedOrigins = [
+        location.origin,
+        'https://tudominio.com'     // Reemplaza con tu dominio en producción
+    ];
+
+    // Comprobar si el origen del mensaje está en la lista de orígenes confiables
+    if (!trustedOrigins.includes(event.origin)) {
+        console.warn('[Service Worker] Mensaje recibido de origen no confiable:', event.origin);
+        return; // Ignorar mensajes de orígenes no confiables
+    }
+
+    // Procesar mensajes verificados
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
