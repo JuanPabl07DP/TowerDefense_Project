@@ -7,6 +7,9 @@ const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
+// Deshabilitar el encabezado X-Powered-By
+app.disable('x-powered-by');
+
 // Configuración para producción/desarrollo
 const isProduction = process.env.NODE_ENV === 'production';
 const frontendOrigin = isProduction ? '*' : 'http://localhost:5173';
