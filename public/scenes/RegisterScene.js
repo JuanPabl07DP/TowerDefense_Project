@@ -194,8 +194,20 @@ export default class RegisterScene extends Phaser.Scene {
     }
 
     validateEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(email);
+        // Limitar longitud primero para evitar entradas muy largas
+        if (!email || email.length > 254) return false;
+
+        // Validación simple de formato sin backtracking excesivo
+        const re = /^[^\s@]{1,64}@[^\s@]{1,255}(?:\.[^\s@]{1,255})+$/;
+
+        // Verificación básica
+        if (!re.test(email)) return false;
+
+        // Verificación de componentes
+        const parts = email.split('@');
+        if (parts.length !== 2) return false;
+
+        return true;
     }
 
     showError(message) {
