@@ -1,6 +1,39 @@
 const { logEvent } = require('../services/auditTrail');
 
 function initializeRoomManager(io, redisClient) {
+    // Sistema de métricas de caché para monitoreo
+    const cacheMetrics = {
+        hits: 0,
+        misses: 0,
+        critical_hits: 0,
+        saves: 0,
+        errors: 0,
+
+        // Método para obtener métricas
+        getMetrics() {
+            const hitRatio = this.hits + this.misses > 0 ?
+                (this.hits / (this.hits + this.misses)) * 100 : 0;
+
+            return {
+                hits: this.hits,
+                misses: this.misses,
+                critical_hits: this.critical_hits,
+                saves: this.saves,
+                errors: this.errors,
+                hit_ratio: `${hitRatio.toFixed(2)}%`
+            };
+        },
+
+        // Método para resetear métricas
+        reset() {
+            this.hits = 0;
+            this.misses = 0;
+            this.critical_hits = 0;
+            this.saves = 0;
+            this.errors = 0;
+        }
+    };
+
     async function generateRoomCode() {
         const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let result = '';
@@ -76,19 +109,13 @@ function initializeRoomManager(io, redisClient) {
     }
 
     async function roomExists(roomCode) {
-        // Registrar verificación de existencia de sala (opcional, puede generar muchos registros)
-        /*
-        logEvent({
-            userId: 'system',
-            ip: '127.0.0.1',
-            operation: 'room:check_exists',
-            details: {
-                roomCode,
-                timestamp: new Date().toISOString()
-            }
-        });
-        */
+        // Verificar primero en caché crítico (más rápido)
+        const criticalExists = await redisClient.exists(`game:${roomCode}:critical`);
+        if (criticalExists) {
+            return true;
+        }
 
+        // Si no está en caché crítico, verificar en Redis normalmente
         return await redisClient.exists(`room:${roomCode}`);
     }
 
@@ -187,8 +214,11 @@ function initializeRoomManager(io, redisClient) {
 
                 // Si no quedan jugadores, eliminar la sala
                 if (players.length === 0) {
+                    // Invalidar caché primero
+                    await invalidateGameState(roomCode);
+
+                    // Eliminar sala
                     await redisClient.del(`room:${roomCode}`);
-                    await redisClient.del(`game:${roomCode}`); // Eliminar también estado del juego
 
                     // Registrar eliminación de sala en audit trail
                     logEvent({
@@ -252,6 +282,15 @@ function initializeRoomManager(io, redisClient) {
         try {
             await redisClient.hSet(`room:${roomCode}`, 'status', status);
 
+            // También actualizar en el estado crítico si existe
+            const criticalState = await getCriticalGameState(roomCode);
+            if (criticalState) {
+                criticalState.roomStatus = status;
+                await redisClient.set(`game:${roomCode}:critical`, JSON.stringify(criticalState), {
+                    EX: 1800 // Mantener la misma TTL
+                });
+            }
+
             // Registrar cambio de estado de sala en audit trail
             logEvent({
                 userId: 'system',
@@ -285,29 +324,44 @@ function initializeRoomManager(io, redisClient) {
 
     async function saveGameState(roomCode, gameState) {
         try {
-            await redisClient.set(`game:${roomCode}`, JSON.stringify(gameState));
+            const startTime = Date.now();
 
-            // Registrar guardado de estado del juego en audit trail (opcional, puede generar muchos registros)
-            /*
-            logEvent({
-                userId: 'system',
-                ip: '127.0.0.1',
-                operation: 'game:state_save',
-                details: {
-                    roomCode,
-                    // No incluir todo el estado del juego para evitar registros enormes
-                    stateSnapshot: {
-                        monedas: gameState.monedas,
-                        oleadaActual: gameState.oleadaActual,
-                        enemigosRestantes: gameState.enemigosRestantes,
-                        enemigosCount: gameState.enemigos?.length || 0,
-                        torresCount: gameState.torres?.length || 0
-                    },
-                    timestamp: new Date().toISOString()
-                }
+            // Guardar estado completo con TTL de 30 minutos
+            await redisClient.set(`game:${roomCode}`, JSON.stringify(gameState), {
+                EX: 1800 // Expiración en 30 minutos
             });
-            */
+
+            // Extraer y guardar estado crítico para acceso rápido
+            const criticalState = {
+                oleadaActual: gameState.oleadaActual,
+                monedas: gameState.monedas,
+                enemigosRestantes: gameState.enemigosRestantes || 0,
+                enOleada: gameState.enOleada || false,
+                enemigoCount: gameState.enemigos ? gameState.enemigos.length : 0,
+                torresCount: gameState.torres ? gameState.torres.length : 0,
+                roomStatus: gameState.roomStatus || 'playing',
+                lastUpdated: Date.now()
+            };
+
+            // Guardar estado crítico con la misma TTL
+            await redisClient.set(`game:${roomCode}:critical`, JSON.stringify(criticalState), {
+                EX: 1800 // Expiración en 30 minutos
+            });
+
+            // Actualizar métricas
+            cacheMetrics.saves++;
+
+            // Log de rendimiento ocasional (solo 1% de las veces para no saturar logs)
+            if (Math.random() < 0.01) {
+                const elapsed = Date.now() - startTime;
+                console.log(`[CACHE] Estado guardado para sala ${roomCode} - Tamaño: ${JSON.stringify(gameState).length} bytes, Tiempo: ${elapsed}ms`);
+            }
+
+            return true;
         } catch (error) {
+            // Actualizar métricas
+            cacheMetrics.errors++;
+
             // Registrar error en audit trail
             logEvent({
                 userId: 'system',
@@ -328,9 +382,41 @@ function initializeRoomManager(io, redisClient) {
 
     async function getGameState(roomCode) {
         try {
+            // Registrar tiempo de inicio para medir rendimiento
+            const startTime = Date.now();
+
+            // Obtener estado completo del juego
             const state = await redisClient.get(`game:${roomCode}`);
-            return state ? JSON.parse(state) : null;
+
+            // Calcular tiempo de respuesta
+            const responseTime = Date.now() - startTime;
+
+            // Si el estado existe, registrar hit y devolverlo parseado
+            if (state) {
+                cacheMetrics.hits++;
+
+                // Log ocasional de rendimiento (solo 1% de las veces)
+                if (Math.random() < 0.01) {
+                    console.log(`[CACHE] HIT - Tiempo de respuesta: ${responseTime}ms para sala ${roomCode}`);
+                }
+
+                return JSON.parse(state);
+            }
+
+            // Si no hay estado en caché, registrar miss
+            cacheMetrics.misses++;
+
+            // Log ocasional (solo 10% de los misses para no saturar)
+            if (Math.random() < 0.1) {
+                console.log(`[CACHE] MISS - No se encontró estado para sala ${roomCode}`);
+            }
+
+            // Si no hay estado en caché, devolver null
+            return null;
         } catch (error) {
+            // Actualizar métricas
+            cacheMetrics.errors++;
+
             // Registrar error en audit trail
             logEvent({
                 userId: 'system',
@@ -349,6 +435,121 @@ function initializeRoomManager(io, redisClient) {
         }
     }
 
+    async function getCriticalGameState(roomCode) {
+        try {
+            const startTime = Date.now();
+
+            // Obtener el estado crítico
+            const criticalState = await redisClient.get(`game:${roomCode}:critical`);
+
+            const responseTime = Date.now() - startTime;
+
+            if (criticalState) {
+                // Actualizar métricas
+                cacheMetrics.critical_hits++;
+
+                // Log ocasional
+                if (Math.random() < 0.01) {
+                    console.log(`[CACHE] CRITICAL HIT - Tiempo: ${responseTime}ms para sala ${roomCode}`);
+                }
+
+                return JSON.parse(criticalState);
+            }
+
+            return null;
+        } catch (error) {
+            console.error(`Error al obtener estado crítico para sala ${roomCode}:`, error);
+            cacheMetrics.errors++;
+            return null;
+        }
+    }
+
+    async function invalidateGameState(roomCode) {
+        try {
+            console.log(`[CACHE] Invalidando caché para sala ${roomCode}`);
+
+            // Eliminar estado completo y crítico
+            await redisClient.del(`game:${roomCode}`);
+            await redisClient.del(`game:${roomCode}:critical`);
+
+            // Registrar en audit trail
+            logEvent({
+                userId: 'system',
+                ip: '127.0.0.1',
+                operation: 'cache:invalidate',
+                details: {
+                    roomCode,
+                    timestamp: new Date().toISOString()
+                }
+            });
+
+            return true;
+        } catch (error) {
+            console.error(`Error al invalidar caché para sala ${roomCode}:`, error);
+            cacheMetrics.errors++;
+            return false;
+        }
+    }
+
+    // Método para comprobar regularmente el estado de caché
+    async function checkCacheHealth() {
+        try {
+            // Obtener todas las claves de salas
+            const roomKeys = await redisClient.keys('room:*');
+
+            // Verificar para cada sala
+            for (const roomKey of roomKeys) {
+                const roomCode = roomKey.replace('room:', '');
+
+                // Verificar coherencia
+                const roomExists = await redisClient.exists(`room:${roomCode}`);
+                const stateExists = await redisClient.exists(`game:${roomCode}`);
+                const criticalExists = await redisClient.exists(`game:${roomCode}:critical`);
+
+                // Si la sala existe pero no tiene estado crítico cuando debería
+                if (roomExists && stateExists && !criticalExists) {
+                    console.log(`[CACHE] Incoherencia detectada para sala ${roomCode}: Falta estado crítico`);
+
+                    // Reconstruir estado crítico
+                    const gameState = await getGameState(roomCode);
+                    if (gameState) {
+                        const criticalState = {
+                            oleadaActual: gameState.oleadaActual,
+                            monedas: gameState.monedas,
+                            enemigosRestantes: gameState.enemigosRestantes || 0,
+                            enOleada: gameState.enOleada || false,
+                            enemigoCount: gameState.enemigos ? gameState.enemigos.length : 0,
+                            torresCount: gameState.torres ? gameState.torres.length : 0,
+                            lastUpdated: Date.now()
+                        };
+
+                        await redisClient.set(`game:${roomCode}:critical`, JSON.stringify(criticalState), {
+                            EX: 1800 // 30 minutos
+                        });
+
+                        console.log(`[CACHE] Reconstruido estado crítico para sala ${roomCode}`);
+                    }
+                }
+            }
+
+            // Registrar métricas de caché cada hora
+            if (Math.random() < 0.01) { // Aproximadamente cada 100 verificaciones
+                console.log(`[CACHE] Métricas actuales:`, cacheMetrics.getMetrics());
+            }
+        } catch (error) {
+            console.error(`[CACHE] Error al verificar salud de caché:`, error);
+        }
+    }
+
+    // Programar verificación periódica de caché (cada 15 minutos)
+    const cacheHealthInterval = setInterval(checkCacheHealth, 15 * 60 * 1000);
+
+    // Asegurar que el intervalo no impida que Node.js se cierre
+    if (cacheHealthInterval.unref) {
+        cacheHealthInterval.unref();
+    }
+
+    // Retornar todas las funciones
     return {
         createRoom,
         joinRoom,
@@ -357,7 +558,10 @@ function initializeRoomManager(io, redisClient) {
         getPlayersInRoom,
         updateRoomStatus,
         saveGameState,
-        getGameState
+        getGameState,
+        getCriticalGameState,   // Nueva función
+        invalidateGameState,    // Nueva función
+        getCacheMetrics: () => cacheMetrics.getMetrics() // Exponer métricas
     };
 }
 
